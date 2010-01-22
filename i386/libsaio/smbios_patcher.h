@@ -6,7 +6,6 @@
 #define __LIBSAIO_SMBIOS_PATCHER_H
 
 #include "libsaio.h"
-#include "SMBIOS.h"
 
 extern EFI_GUID gEfiAcpiTableGuid;
 extern EFI_GUID gEfiAcpi20TableGuid;
@@ -55,6 +54,4 @@ struct smbios_table_description
 };
 
 
-extern struct SMBEntryPoint *	getAddressOfSmbiosTable(void);
-extern struct SMBEntryPoint *	getSmbios(void);
 #endif /* !__LIBSAIO_SMBIOS_PATCHER_H */

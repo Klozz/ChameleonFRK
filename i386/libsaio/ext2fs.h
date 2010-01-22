@@ -7,5 +7,5 @@
  *
  */
 
-extern bool EX2Probe (const void *buf);
+extern BOOL EX2Probe (const void *buf);
 extern void EX2GetDescription(CICell ih, char *str, long strMaxLen);

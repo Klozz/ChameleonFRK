@@ -33,7 +33,14 @@
 extern char *Language;
 extern char *LoadableFamilies;
 
-bool sysConfigValid;
+int sysConfigValid;
+
+//static void eatThru(char val, const char **table_p);
+
+static inline int isspace(char c)
+{
+    return (c == ' ' || c == '\t');
+}
 
 /*
  * Compare a string to a key with quoted characters
@@ -74,14 +81,14 @@ keyncmp(const char *str, const char *key, int n)
 static void eatThru(char val, const char **table_p)
 {
 	register const char *table = *table_p;
-	register bool found = false;
+	register BOOL found = NO;
 
 	while (*table && !found)
 	{
 		if (*table == '\\') table += 2;
 		else
 		{
-			if (*table == val) found = true;
+			if (*table == val) found = YES;
 			table++;
 		}
 	}
@@ -90,7 +97,7 @@ static void eatThru(char val, const char **table_p)
 
 /* Remove key and its associated value from the table. */
 
-bool
+BOOL
 removeKeyFromTable(const char *key, char *table)
 {
     register int len;
@@ -125,13 +132,13 @@ removeKeyFromTable(const char *key, char *table)
 out:
     free(buf);
 
-    if(len == -1) return false;
+    if(len == -1) return NO;
 
     while((*tab = *(tab + len))) {
         tab++;
     }
 
-    return true;
+    return YES;
 }
 
 char *
@@ -191,7 +198,7 @@ int stringLength(const char *table, int compress)
 }
 
 
-bool getValueForConfigTableKey(config_file_t *config, const char *key, const char **val, int *size)
+BOOL getValueForConfigTableKey(config_file_t *config, const char *key, const char **val, int *size)
 {
 	if (config->dictionary != 0 ) {
 		// Look up key in XML dictionary
@@ -201,11 +208,11 @@ bool getValueForConfigTableKey(config_file_t *config, const char *key, const cha
 			if (value->type != kTagTypeString) {
 				error("Non-string tag '%s' found in config file\n",
 					  key);
-				return false;
+				return NO;
 			}
 			*val = value->string;
 			*size = strlen(value->string);
-			return true;
+			return YES;
 		}
 	} else {
 	
@@ -213,7 +220,7 @@ bool getValueForConfigTableKey(config_file_t *config, const char *key, const cha
 
 	}
 
-	return false;
+	return NO;
 }
 
 #if UNUSED
@@ -301,11 +308,11 @@ static const char *getToken(const char *line, const char **begin, int *len)
     return line;
 }
 
-bool getValueForBootKey(const char *line, const char *match, const char **matchval, int *len)
+BOOL getValueForBootKey(const char *line, const char *match, const char **matchval, int *len)
 {
     const char *key, *value;
     int key_len, value_len;
-    bool retval = false;
+    BOOL retval = NO;
     
     while (*line) {
 	/* look for keyword or argument */
@@ -324,48 +331,38 @@ bool getValueForBootKey(const char *line, const char *match, const char **matchv
 	    && strncmp(match, key, key_len) == 0) {
 	    *matchval = value;
 	    *len = value_len;
-	    retval = true;
+	    retval = YES;
             /* Continue to look for this key; last one wins. */
 	}
     }
     return retval;
 }
 
-/* Return NULL if no option has been successfully retrieved, or the string otherwise */
-const char * getStringForKey(const char * key,  config_file_t *config)
-{
-  static const char* value =0;
-  int len=0;
-  if(!getValueForKey(key, &value, &len, config)) value = 0;
-  return value;
-}
-
-
 /* Returns TRUE if a value was found, FALSE otherwise.
  * The boolean value of the key is stored in 'val'.
  */
 
-bool getBoolForKey( const char *key, bool *result_val, config_file_t *config )
+BOOL getBoolForKey( const char *key, BOOL *result_val, config_file_t *config )
 {
     const char *key_val;
     int size;
     
     if (getValueForKey(key, &key_val, &size, config)) {
         if ( (size >= 1) && (key_val[0] == 'Y' || key_val[0] == 'y') ) {
-            *result_val = true;
+            *result_val = YES;
         } else {
-            *result_val = false;
+            *result_val = NO;
         }
-        return true;
+        return YES;
     }
-    return false;
+    return NO;
 }
 
-bool getIntForKey( const char *key, int *value, config_file_t *config )
+BOOL getIntForKey( const char *key, int *value, config_file_t *config )
 {
     const char *val;
     int size, sum;
-    bool negative = false;
+    BOOL negative = NO;
     
     if (getValueForKey(key, &val, &size, config))
 	{
@@ -373,7 +370,7 @@ bool getIntForKey( const char *key, int *value, config_file_t *config )
 		{
 			if (*val == '-')
 			{
-				negative = true;
+				negative = YES;
 				val++;
 				size--;
 			}
@@ -381,7 +378,7 @@ bool getIntForKey( const char *key, int *value, config_file_t *config )
 			for (sum = 0; size > 0; size--)
 			{
 				if (*val < '0' || *val > '9')
-					return false;
+					return NO;
 				
 				sum = (sum * 10) + (*val++ - '0');
 			}
@@ -390,25 +387,25 @@ bool getIntForKey( const char *key, int *value, config_file_t *config )
 				sum = -sum;
 			
 			*value = sum;
-			return true;
+			return YES;
 		}
 	}
-    return false;
+    return NO;
 }
 
 /*
  *
  */
 
-bool getDimensionForKey( const char *key, unsigned int *value, config_file_t *config, unsigned int dimension_max, unsigned int object_size )
+BOOL getDimensionForKey( const char *key, unsigned int *value, config_file_t *config, unsigned int dimension_max, unsigned int object_size )
 {
 	const char *val;
 	
     int size = 0;
 	int sum = 0;
     
-	bool negative = false;
-	bool percentage = false;
+	BOOL negative = NO;
+	BOOL percentage = NO;
 	
     if (getValueForKey(key, &val, &size, config))
 	{
@@ -416,14 +413,14 @@ bool getDimensionForKey( const char *key, unsigned int *value, config_file_t *co
 		{
 			if (*val == '-')
 			{
-				negative = true;
+				negative = YES;
 				val++;
 				size--;
 			}
 			
 			if (val[size-1] == '%')
 			{
-				percentage = true;
+				percentage = YES;
 				size--;
 			}
 			
@@ -431,7 +428,7 @@ bool getDimensionForKey( const char *key, unsigned int *value, config_file_t *co
 			for (sum = 0; size > 0; size--)
 			{
 				if (*val < '0' || *val > '9')
-					return false;
+					return NO;
 				
 				sum = (sum * 10) + (*val++ - '0');
 			}
@@ -451,18 +448,18 @@ bool getDimensionForKey( const char *key, unsigned int *value, config_file_t *co
 		}
 		
 		*value = (uint16_t) sum;
-		return true;
+		return YES;
 	}
 	
 	// key not found
-    return false;
+    return NO;
 }
 
 /*
  *	get color value from plist format #RRGGBB
  */
 
-bool getColorForKey( const char *key, unsigned int *value, config_file_t *config )
+BOOL getColorForKey( const char *key, unsigned int *value, config_file_t *config )
 {
     const char *val;
     int size;
@@ -473,20 +470,20 @@ bool getColorForKey( const char *key, unsigned int *value, config_file_t *config
 		{
             val++;
 			*value = strtol(val, NULL, 16);
-			return true;
+			return YES;
         }
     }
-    return false;
+    return NO;
 }
 
-bool getValueForKey( const char *key, const char **val, int *size, config_file_t *config )
+BOOL getValueForKey( const char *key, const char **val, int *size, config_file_t *config )
 {
   const char *overrideVal;
   int overrideSize;
-  bool override, ret;
+  BOOL override, ret;
   
   if (getValueForBootKey(bootArgs->CommandLine, key, val, size))
-    return true;
+    return YES;
 
   ret = getValueForConfigTableKey(config, key, val, size);
 
@@ -498,19 +495,19 @@ bool getValueForKey( const char *key, const char **val, int *size, config_file_t
   {
     if (getValueForConfigTableKey(&bootInfo->overrideConfig, key, &overrideVal, &overrideSize))
     {
-      override = true;
+      override = YES;
 
       if (ret && (strcmp(key, "Kernel") == 0) && (strcmp(overrideVal, "mach_kernel") == 0))
-        override = false;
+        override = NO;
 
       if (ret && (strcmp(key, "Kernel Flags") == 0) && (overrideSize == 0))
-        override = false;
+        override = NO;
 
       if (override)
       {
         *val = overrideVal;
         *size = overrideSize;
-        return true;
+        return YES;
       }
     }
   }
@@ -546,7 +543,7 @@ printSystemConfig(char *p1)
 // (and does not modify dict pointer).
 // Prints an error message if there is a parsing error.
 //
-int ParseXMLFile( char * buffer, TagPtr * dict )
+long ParseXMLFile( char * buffer, TagPtr * dict )
 {
     long       length, pos;
     TagPtr     tag;
@@ -585,9 +582,17 @@ int ParseXMLFile( char * buffer, TagPtr * dict )
 int loadConfigFile (const char *configFile, config_file_t *config)
 {
 	int fd, count;
+	char dirspec[512];
 
-	if ((fd = open_bvdev("bt(0,0)", configFile, 0)) < 0) {
-		return -1;
+	sprintf(dirspec,"%s",configFile);
+	fd = open(dirspec, 0);
+	if (fd<0)
+	{
+		dirspec[0] = '\0';
+		sprintf(dirspec,"bt(0,0)%s",configFile);
+		fd = open(dirspec, 0);
+		if (fd<0)
+			return -1;
 	}
 	// read file
 	count = read(fd, config->plist, IO_CONFIG_DATA_SIZE);
@@ -627,11 +632,11 @@ int loadSystemConfig(config_file_t *config)
 			
 			// build xml dictionary
 			ParseXMLFile(config->plist, &config->dictionary);
-			sysConfigValid = true;	
+			sysConfigValid=1;	
 			ret=0;
 			
 			// enable canOverride flag
-			config->canOverride = true;
+			config->canOverride = TRUE;
 
 			break;
 		}
@@ -667,7 +672,7 @@ int loadOverrideConfig(config_file_t *config)
 			
 			// build xml dictionary
 			ParseXMLFile(config->plist, &config->dictionary);
-			sysConfigValid = true;	
+			sysConfigValid=1;	
 			ret=0;
 			break;
 		}
@@ -700,7 +705,7 @@ int loadHelperConfig(config_file_t *config)
 			
 			// build xml dictionary
 			ParseXMLFile(config->plist, &config->dictionary);
-			sysConfigValid = true;	
+			sysConfigValid=1;	
 			ret=0;
 			break;
 		}
@@ -724,7 +729,7 @@ char * getNextArg(char ** argPtr, char * val)
   char * ptr = *argPtr;
   const char * strStart;
   int len = 0;
-  bool isQuoted = false;
+  BOOL isQuoted = FALSE;
 
   *val = '\0';
 
@@ -739,7 +744,7 @@ char * getNextArg(char ** argPtr, char * val)
   // Skip the leading double quote character.
   if (*ptr == '\"')
   {
-    isQuoted = true;
+    isQuoted = TRUE;
     ptr++;
     strStart++;
   }

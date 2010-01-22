@@ -49,8 +49,8 @@
 
 extern int	vprf(const char * fmt, va_list ap);
 
-bool gVerboseMode;
-bool gErrors;
+BOOL gVerboseMode;
+BOOL gErrors;
 
 /*
  * write one character to console
@@ -126,7 +126,7 @@ int verbose(const char * fmt, ...)
 int error(const char * fmt, ...)
 {
     va_list ap;
-    gErrors = true;
+    gErrors = YES;
     va_start(ap, fmt);
 	if (bootArgs->Video.v_display == VGA_TEXT_MODE)
 		prf(fmt, ap, putchar, 0);
@@ -138,17 +138,15 @@ int error(const char * fmt, ...)
 
 void stop(const char * fmt, ...)
 {
-	va_list ap;
-
-	printf("\n");
-	va_start(ap, fmt);
-	if (bootArgs->Video.v_display == VGA_TEXT_MODE) {
+    va_list ap;
+	
+    printf("\n");
+    va_start(ap, fmt);
+	if (bootArgs->Video.v_display == VGA_TEXT_MODE)
 		prf(fmt, ap, putchar, 0);
-	} else {
+    else
 		vprf(fmt, ap);
-	}
 	va_end(ap);
-	printf("\nThis is a non recoverable error! System HALTED!!!");
-	halt();
-	while (1);
+    printf("\n");
+    halt();
 }

@@ -389,7 +389,7 @@ static inline uint32_t multiboot(int multiboot_magic, struct multiboot_info *mi)
         const char *val;
         int size;
         
-        if(getValueForBootKey(mi->mi_cmdline, "biosdev", &val, &size))
+        if(getValueForBootKey(mi->mi_cmdline, "biosdev", &val, &size) != NO)
         {
             char *endptr;
             int intVal = strtol(val, &endptr, 16 /* always hex */);
@@ -403,7 +403,7 @@ static inline uint32_t multiboot(int multiboot_magic, struct multiboot_info *mi)
                 doSelectDevice = true;
         }
 		
-        if(getValueForBootKey(mi->mi_cmdline, "timeout", &val, &size))
+        if(getValueForBootKey(mi->mi_cmdline, "timeout", &val, &size) != NO)
         {
             char *endptr;
             int intVal = strtol(val, &endptr, 0);
@@ -415,7 +415,7 @@ static inline uint32_t multiboot(int multiboot_magic, struct multiboot_info *mi)
             }
         }		
 		
-        if(getValueForBootKey(mi->mi_cmdline, "partno", &val, &size))
+        if(getValueForBootKey(mi->mi_cmdline, "partno", &val, &size) != NO)
         {
             char *endptr;
             int intVal = strtol(val, &endptr, 0);
@@ -466,9 +466,9 @@ int multiboot_get_ramdisk_info(int biosdev, struct driveInfo *dip)
         return -1;
     struct multiboot_module *module = modules + (biosdev - 0x100);
     dip->biosdev = biosdev;
-    dip->uses_ebios = true;	// XXX aserebln uses_ebios isn't a boolean at all
+    dip->uses_ebios = TRUE;
     dip->di.params.phys_sectors = (module->mm_mod_end - module->mm_mod_start + 511) / 512;
-    dip->valid = true;
+    dip->valid = TRUE;
     return 0;
 }
 

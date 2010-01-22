@@ -38,7 +38,7 @@ static long DecodeSymbolTable(long cmdBase);
 
 
 static unsigned long gBinaryAddress;
-bool   gHaveKernelCache;			/* XXX aserebln: uninitialized? and only set to true, never to false */
+BOOL   gHaveKernelCache;
 cpu_type_t archCpuType=CPU_TYPE_I386;
 
 // Public Functions
@@ -250,7 +250,7 @@ static long DecodeSegment(long cmdBase, unsigned int *load_addr, unsigned int *l
   }
 
   if (vmsize && (strcmp(segname, "__PRELINK") == 0))
-    gHaveKernelCache = true;
+    gHaveKernelCache = 1;
   
   // Copy from file load area.
   if (vmsize>0 && filesize>0)

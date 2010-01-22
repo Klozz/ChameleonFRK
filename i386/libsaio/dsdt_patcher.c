@@ -3,13 +3,11 @@
  */
 
 #include "libsaio.h"
-#include "boot.h"
 #include "bootstruct.h"
 #include "acpi.h"
 #include "efi_tables.h"
 #include "fake_efi.h"
 #include "dsdt_patcher.h"
-#include "platform.h"
 
 #ifndef DEBUG_DSDT
 #define DEBUG_DSDT 0
@@ -73,13 +71,50 @@ static struct acpi_2_rsdp* getAddressOfAcpi20Table()
     return NULL;
 }
 
+void *loadACPITable (const char *filename)
+{
+	void *kernelAddr;
+	int fd;
+	char dirspec[512];
+	
+	// Check booting partition
+	sprintf(dirspec,"%s",filename);
+	fd=open (dirspec,0);
+	if (fd<0)
+	{	// Check Extra on booting partition
+		sprintf(dirspec,"/Extra/%s",filename);
+		fd=open (dirspec,0);
+		if (fd<0)
+		{	// Fall back to booter partition
+			sprintf(dirspec,"bt(0,0)/Extra/%s",filename);
+			fd=open (dirspec,0);
+			if (fd<0)
+			{
+				verbose("ACPI Table not found: %s\n", filename);
+				return NULL;
+			}
+		}
+	}
+	
+	kernelAddr=(void*)AllocateKernelMemory(file_size (fd));
+	if (kernelAddr)
+	{
+		read (fd, kernelAddr, file_size (fd));
+		DBG("File read and stored at: %x\n", kernelAddr);
+		close (fd);
+		return kernelAddr;
+	}
+	close (fd);				
+	return NULL;	
+}	
+
+
 
 /* Setup ACPI without replacing DSDT. */
 int setupAcpiNoMod()
 {
 //	addConfigurationTable(&gEfiAcpiTableGuid, getAddressOfAcpiTable(), "ACPI");
 //	addConfigurationTable(&gEfiAcpi20TableGuid, getAddressOfAcpi20Table(), "ACPI_20");
-	/* XXX aserebln why uint32 cast if pointer is uint64 ? */
 	acpi10_p = (uint32_t)getAddressOfAcpiTable();
 	acpi20_p = (uint32_t)getAddressOfAcpi20Table();
 	addConfigurationTable(&gEfiAcpiTableGuid, &acpi10_p, "ACPI");
@@ -88,51 +123,37 @@ int setupAcpiNoMod()
 }
 
 /* Setup ACPI. Replace DSDT if DSDT.aml is found */
-int setupAcpi(void)
+int setupAcpi()
 {
-	int fd, version;
+	int version;
 	void *new_dsdt;
 	const char *dsdt_filename;
+	const char *facp_filename;
 	int len;
-	bool tmp;
-	bool drop_ssdt;
-	bool fix_restart;
+	boolean_t drop_ssdt=NO;
+	boolean_t FixRestart=NO;
 
-	if (!getValueForKey(kDSDT, &dsdt_filename, &len, &bootInfo->bootConfig)) {
-		dsdt_filename = "/Extra/DSDT.aml";
-	}
+	//DBG("Enter setupACPI\n");
 
-	if ((fd = open_bvdev("bt(0,0)", dsdt_filename, 0)) < 0) {
-		verbose("No DSDT replacement found. Leaving ACPI data as is\n");
-		return setupAcpiNoMod();
-	}
-
+	if (!getValueForKey("DSDT", &dsdt_filename, &len, &bootInfo->bootConfig))
+		dsdt_filename="DSDT.aml";
+	
 	// Load replacement DSDT
-	new_dsdt = (void*)AllocateKernelMemory(file_size (fd));
-	if (!new_dsdt) {
-		printf("Couldn't allocate memory for DSDT\n");
-		close(fd);
+	new_dsdt=loadACPITable(dsdt_filename);
+	if (!new_dsdt)
+	{ 
 		return setupAcpiNoMod();
-	}
-	if (read(fd, new_dsdt, file_size(fd)) != file_size(fd)) {
-		printf("Couldn't read file\n");
-		close(fd);
-		return setupAcpiNoMod();
-	}
-	close(fd);
+	}	
 	DBG("New DSDT Loaded in memory\n");
-
-	drop_ssdt = getBoolForKey(kDropSSDT, &tmp, &bootInfo->bootConfig) && tmp;
-
-	if (Platform.CPU.Vendor == 0x756E6547) {	/* Intel */
-		fix_restart = true;
-		getBoolForKey(kRestartFix, &fix_restart, &bootInfo->bootConfig);
-	} else {
-		fix_restart = false;
-	}
-
+	
+	BOOL tmp;
+	drop_ssdt=getBoolForKey("DropSSDT",&tmp, &bootInfo->bootConfig)&&tmp;
+	FixRestart=getBoolForKey("RestartFix",&tmp, &bootInfo->bootConfig)&&tmp;
+	
+	
 	// Do the same procedure for both versions of ACPI
-	for (version=0; version<2; version++) {
+	for (version=0;version<2;version++)
+	{
 		struct acpi_2_rsdp *rsdp, *rsdp_mod;
 		struct acpi_2_rsdt *rsdt, *rsdt_mod;
 		int rsdplength;
@@ -198,44 +219,47 @@ int setupAcpi(void)
 				{
 					struct acpi_2_fadt *fadt, *fadt_mod;
 					fadt=(struct acpi_2_fadt *)rsdt_entries[i];
-
+					
 					DBG("FADT found @%x, Length %d\n",fadt, fadt->Length);
-
+					
 					if (!fadt || (uint32_t)fadt == 0xffffffff || fadt->Length>0x10000)
 					{
 						printf("FADT incorrect. Not modified\n");
 						continue;
 					}
 					
-					if (fix_restart && fadt->Length < 0x81) {
-						fadt_mod = (struct acpi_2_fadt *)AllocateKernelMemory(0x81);
+					if (fadt->Length < 0x81 && FixRestart)
+					{
+						fadt_mod=(struct acpi_2_fadt *)AllocateKernelMemory(0x81); 
 						memcpy(fadt_mod, fadt, fadt->Length);
 						fadt_mod->Length = 0x81;
-					} else {                                                                                          
-						fadt_mod = (struct acpi_2_fadt *)AllocateKernelMemory(fadt->Length);
+					}
+					else
+					{														
+						fadt_mod=(struct acpi_2_fadt *)AllocateKernelMemory(fadt->Length); 
 						memcpy(fadt_mod, fadt, fadt->Length);
 					}
-
-					if (fix_restart) {
-						fadt_mod->Flags |= 0x400;
-						fadt_mod->Reset_SpaceID = 0x01;
-						fadt_mod->Reset_BitWidth = 0x08;
-						fadt_mod->Reset_BitOffset = 0x00;
+					
+					if (FixRestart)
+					{
+						fadt_mod->Flags|= 0x400;
+						fadt_mod->Reset_SpaceID		= 0x01;
+						fadt_mod->Reset_BitWidth	= 0x08;
+						fadt_mod->Reset_BitOffset	= 0x00;
 						fadt_mod->Reset_AccessWidth = 0x01;
-						fadt_mod->Reset_Address = 0x0cf9;
-						fadt_mod->Reset_Value = 0x06;
-						verbose("FACP: Restart Fix applied\n");
+						fadt_mod->Reset_Address		= 0x0cf9;
+						fadt_mod->Reset_Value		= 0x06;
 					}
-
+					
 					// Patch DSDT Address
 					DBG("Old DSDT @%x,%x\n",fadt_mod->DSDT,fadt_mod->X_DSDT);
-
+					
 					fadt_mod->DSDT=(uint32_t)new_dsdt;
 					if ((uint32_t)(&(fadt_mod->X_DSDT))-(uint32_t)fadt_mod+8<=fadt_mod->Length)
 						fadt_mod->X_DSDT=(uint32_t)new_dsdt;
-
+					
 					DBG("New DSDT @%x,%x\n",fadt_mod->DSDT,fadt_mod->X_DSDT);
-
+					
 					// Correct the checksum
 					fadt_mod->Checksum=0;
 					fadt_mod->Checksum=256-checksum8(fadt_mod,fadt_mod->Length);
@@ -244,7 +268,7 @@ int setupAcpi(void)
 					continue;
 				}
 			}
-
+			
 			// Correct the checksum of RSDT
 			rsdt_mod->Length-=4*dropoffset;
 
@@ -315,44 +339,43 @@ int setupAcpi(void)
 							printf("FADT incorrect or after 4GB. Dropping XSDT\n");
 							goto drop_xsdt;
 						}
-
-						if (fix_restart && fadt->Length < 0x81) {
-							fadt_mod = (struct acpi_2_fadt *)AllocateKernelMemory(0x81);
+						
+						if (fadt->Length < 0x81 && FixRestart)
+						{
+							fadt_mod=(struct acpi_2_fadt *)AllocateKernelMemory(0x81); 
 							memcpy(fadt_mod, fadt, fadt->Length);
 							fadt_mod->Length = 0x81;
-						} else {
-							fadt_mod = (struct acpi_2_fadt*)AllocateKernelMemory(fadt->Length); 
+						}
+						else
+						{														
+							fadt_mod=(struct acpi_2_fadt *)AllocateKernelMemory(fadt->Length); 
 							memcpy(fadt_mod, fadt, fadt->Length);
 						}
-
-						if (fix_restart) {
-							fadt_mod->Flags |= 0x400;
-							fadt_mod->Reset_SpaceID = 0x01;
-							fadt_mod->Reset_BitWidth = 0x08;
-							fadt_mod->Reset_BitOffset = 0x00;
+						
+						if (FixRestart)
+						{
+							fadt_mod->Flags|= 0x400;
+							fadt_mod->Reset_SpaceID		= 0x01;
+							fadt_mod->Reset_BitWidth	= 0x08;
+							fadt_mod->Reset_BitOffset	= 0x00;
 							fadt_mod->Reset_AccessWidth = 0x01;
-							fadt_mod->Reset_Address = 0x0cf9;
-							fadt_mod->Reset_Value = 0x06;
-							verbose("FACP: Restart Fix applied\n");
-						}
+							fadt_mod->Reset_Address		= 0x0cf9;
+							fadt_mod->Reset_Value		= 0x06;
+						}						
 
-						// Patch DSDT Address
 						DBG("Old DSDT @%x,%x\n",fadt_mod->DSDT,fadt_mod->X_DSDT);
-
+						
 						fadt_mod->DSDT=(uint32_t)new_dsdt;
 						if ((uint32_t)(&(fadt_mod->X_DSDT))-(uint32_t)fadt_mod+8<=fadt_mod->Length)
 							fadt_mod->X_DSDT=(uint32_t)new_dsdt;
-
+						
 						DBG("New DSDT @%x,%x\n",fadt_mod->DSDT,fadt_mod->X_DSDT);
-
+						
 						// Correct the checksum
 						fadt_mod->Checksum=0;
 						fadt_mod->Checksum=256-checksum8(fadt_mod,fadt_mod->Length);
 						
 						xsdt_entries[i-dropoffset]=(uint32_t)fadt_mod;
-
-						DBG("TABLE %c%c%c%c@%x,",table[0],table[1],table[2],table[3],xsdt_entries[i]);
-
 						continue;
 					}
 
@@ -403,20 +426,17 @@ int setupAcpi(void)
 		verbose("Patched ACPI version %d DSDT\n", version+1);
 		if (version)
 		{
-	/* XXX aserebln why uint32 cast if pointer is uint64 ? */
 			acpi20_p = (uint32_t)rsdp_mod;
 			addConfigurationTable(&gEfiAcpi20TableGuid, &acpi20_p, "ACPI_20");
 		}
 		else
 		{
-	/* XXX aserebln why uint32 cast if pointer is uint64 ? */
 			acpi10_p = (uint32_t)rsdp_mod;
 			addConfigurationTable(&gEfiAcpiTableGuid, &acpi10_p, "ACPI");
 		}
 	}
-#if DEBUG_DSDT
-	printf("(Press a key to continue...)\n");
+	#if DEBUG_DSDT
 	getc();
-#endif
+	#endif
 	return 1;
 }

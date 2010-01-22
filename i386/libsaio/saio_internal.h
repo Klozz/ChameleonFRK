@@ -39,7 +39,7 @@ extern void   bios(biosBuf_t *bb);
 
 /* biosfn.c */
 #ifdef EISA_SUPPORT
-extern bool   eisa_present(void);
+extern BOOL   eisa_present(void);
 #endif
 extern int    bgetc(void);
 extern int    biosread(int dev, int cyl, int head, int sec, int num);
@@ -86,8 +86,8 @@ extern long   CacheRead(CICell ih, char *buffer, long long offset,
                         long length, long cache);
 
 /* console.c */
-extern bool   gVerboseMode;
-extern bool   gErrors;
+extern BOOL   gVerboseMode;
+extern BOOL   gErrors;
 extern void   putchar(int ch);
 extern int    getchar(void);
 extern int    printf(const char *format, ...);
@@ -123,7 +123,7 @@ extern void utf_decodestr(const u_int8_t *utf8p, u_int16_t *ucsp,
                 u_int16_t *ucslen, u_int32_t bufsize, int byte_order );
 
 /* load.c */
-extern bool   gHaveKernelCache;
+extern char   gHaveKernelCache;
 extern long ThinFatFile(void **binary, unsigned long *length);
 extern long DecodeMachO(void *binary, entry_t *rentry, char **raddr, int *rsize);
 
@@ -144,24 +144,23 @@ extern BVRef  nbpScanBootVolumes(int biosdev, int *count);
 /* stringTable.c */
 extern char * newStringFromList(char **list, int *size);
 extern int    stringLength(const char *table, int compress);
-extern bool   getValueForConfigTableKey(config_file_t *config, const char *key, const char **val, int *size);
-extern bool   removeKeyFromTable(const char *key, char *table);
+extern BOOL   getValueForConfigTableKey(config_file_t *config, const char *key, const char **val, int *size);
+extern BOOL   removeKeyFromTable(const char *key, char *table);
 extern char * newStringForStringTableKey(config_file_t *config, char *key);
 extern char * newStringForKey(char *key, config_file_t *configBuff);
-extern bool   getValueForBootKey(const char *line, const char *match, const char **matchval, int *len);
-extern bool   getValueForKey(const char *key, const char **val, int *size, config_file_t *configBuff);
-extern const char * getStringForKey(const char * key,  config_file_t *config);
-extern bool   getBoolForKey(const char *key, bool *val, config_file_t *configBuff);
-extern bool   getIntForKey(const char *key, int *val, config_file_t *configBuff);
-extern bool   getColorForKey(const char *key, unsigned int *val, config_file_t *configBuff);
-extern bool	  getDimensionForKey( const char *key, unsigned int *value, config_file_t *config, unsigned int dimension_max, unsigned int object_size );
+extern BOOL   getValueForBootKey(const char *line, const char *match, const char **matchval, int *len);
+extern BOOL   getValueForKey(const char *key, const char **val, int *size, config_file_t *configBuff);
+extern BOOL   getBoolForKey(const char *key, BOOL *val, config_file_t *configBuff);
+extern BOOL   getIntForKey(const char *key, int *val, config_file_t *configBuff);
+extern BOOL   getColorForKey(const char *key, unsigned int *val, config_file_t *configBuff);
+extern BOOL	  getDimensionForKey( const char *key, unsigned int *value, config_file_t *config, unsigned int dimension_max, unsigned int object_size );
 extern int    loadConfigFile(const char *configFile, config_file_t *configBuff);
 extern int    loadSystemConfig(config_file_t *configBuff);
 extern int    loadHelperConfig(config_file_t *configBuff);
 extern int    loadOverrideConfig(config_file_t *configBuff);
 extern char * newString(const char *oldString);
 extern char * getNextArg(char ** ptr, char * val);
-extern int	  ParseXMLFile( char * buffer, TagPtr * dict );
+extern long	  ParseXMLFile( char * buffer, TagPtr * dict );
 
 /* sys.c */
 extern BVRef getBootVolumeRef( const char * path, const char ** outPath );
@@ -178,7 +177,6 @@ extern long   GetFSUUID(char *spec, char *uuidStr);
 extern long   CreateUUIDString(uint8_t uubytes[], int nbytes, char *uuidStr);
 extern int    openmem(char *buf, int len);
 extern int    open(const char *str, int how);
-extern int    open_bvdev(const char *bvd, const char *path, int flags);
 extern int    close(int fdesc);
 extern int    file_size(int fdesc);
 extern int    read(int fdesc, char *buf, int count);
@@ -195,7 +193,7 @@ extern void   flushdev(void);
 extern void   scanBootVolumes(int biosdev, int *count);
 extern void   scanDisks(int biosdev, int *count);
 extern BVRef  selectBootVolume(BVRef chain);
-extern void   getBootVolumeDescription(BVRef bvr, char *str, long strMaxLen, bool verbose);
+extern void   getBootVolumeDescription(BVRef bvr, char *str, long strMaxLen, BOOL verbose);
 extern void   setRootVolume(BVRef volume);
 extern void   setBootGlobals(BVRef chain);
 

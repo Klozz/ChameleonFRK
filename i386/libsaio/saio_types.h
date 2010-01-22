@@ -38,6 +38,10 @@
 #define DEBUG_DISK(x)
 #endif
 
+typedef char BOOL;
+#define NO   0
+#define YES  1
+
 typedef unsigned long entry_t;
 
 typedef struct {
@@ -64,7 +68,7 @@ typedef struct Tag Tag, *TagPtr;
 typedef struct {
 	char	plist[4096];	// buffer for plist
 	TagPtr	dictionary;		// buffer for xml dictionary
-	bool  canOverride;  // flag to mark a dictionary can be overriden
+	BOOL  canOverride;  // flag to mark a dictionary can be overriden
 } config_file_t;
 
 /*
@@ -186,8 +190,8 @@ struct BootVolume {
     uint32_t         modTime;
     char			       label[BVSTRLEN]; /* partition volume label */
     char			       altlabel[BVSTRLEN]; /* partition volume label */
-    bool             filtered;        /* newFilteredBVChain() will set to TRUE */
-    bool             visible;         /* will shown in the device list */
+    BOOL             filtered;        /* newFilteredBVChain() will set to TRUE */
+    BOOL             visible;         /* will shown in the device list */
 };
 
 enum {

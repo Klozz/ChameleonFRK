@@ -109,7 +109,8 @@ extern long BinaryUnicodeCompare(u_int16_t *uniStr1, u_int32_t len1,
                                  u_int16_t *uniStr2, u_int32_t len2);
 
 
-static void SwapFinderInfo(FndrFileInfo *dst, FndrFileInfo *src)
+static void
+SwapFinderInfo(FndrFileInfo *dst, FndrFileInfo *src)
 {
     dst->fdType = SWAP_BE32(src->fdType);
     dst->fdCreator = SWAP_BE32(src->fdCreator);
@@ -124,7 +125,8 @@ void HFSFree(CICell ih)
     free(ih);
 }
 
-bool HFSProbe (const void *buf)
+BOOL 
+HFSProbe (const void *buf)
 {
 	const HFSMasterDirectoryBlock *mdb;
 	const HFSPlusVolumeHeader     *header;
@@ -132,11 +134,11 @@ bool HFSProbe (const void *buf)
 	header=(const HFSPlusVolumeHeader *)(((const char*)buf)+kMDBBaseOffset);
 	
 	if ( SWAP_BE16(mdb->drSigWord) == kHFSSigWord )
-		return true;
+		return TRUE;
 	if (SWAP_BE16(header->signature) != kHFSPlusSigWord &&
         SWAP_BE16(header->signature) != kHFSXSigWord)
-		return false;
-	return true;
+		return FALSE;
+	return TRUE;
 }
 
 long HFSInitPartition(CICell ih)

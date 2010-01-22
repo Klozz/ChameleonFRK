@@ -100,7 +100,8 @@ void MSDOSFree(CICell ih)
     free(ih);
 }
 
-int MSDOSProbe(const void * buffer)
+int 
+MSDOSProbe(const void * buffer)
 {
     union bootsector    *bsp;
     struct bpb33        *b33;
@@ -117,12 +118,12 @@ int MSDOSProbe(const void * buffer)
     /* We only work with 512, 1024, and 2048 byte sectors */
     bps = OSSwapLittleToHostInt16(b33->bpbBytesPerSec);
     if ((bps < 0x200) || (bps & (bps - 1)) || (bps > 0x800)) 
-        return 0;
+        return FALSE;
     
 	/* Check to make sure valid sectors per cluster */
     spc = b33->bpbSecPerClust;
     if ((spc == 0 ) || (spc & (spc - 1))) 
-        return 0;	
+        return FALSE;	
 	
 	if (OSSwapLittleToHostInt16(b50->bpbRootDirEnts) == 0) { /* It's FAT32 */
 		if (!memcmp(((struct extboot *)bsp->bs710.bsExt)->exFileSysType, "FAT32   ", 8))
@@ -135,7 +136,7 @@ int MSDOSProbe(const void * buffer)
 			return 12;
 	}	
 		
-	return 0;
+	return FALSE;
 }
 
 

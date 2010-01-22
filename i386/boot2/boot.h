@@ -34,68 +34,40 @@
 /*
  * Keys used in system Boot.plist
  */
-#define kGraphicsModeKey	"Graphics Mode"
-#define kTextModeKey		"Text Mode"
-#define kQuietBootKey		"Quiet Boot"
-#define kKernelFlagsKey		"Kernel Flags"
-#define kMKextCacheKey		"MKext Cache"
-#define kKernelNameKey		"Kernel"
-#define kKernelCacheKey		"Kernel Cache"
-#define kBootDeviceKey		"Boot Device"
-#define kTimeoutKey		"Timeout"
-#define kRootDeviceKey		"rd"
-#define kBootUUIDKey		"boot-uuid"
-#define kHelperRootUUIDKey	"Root UUID"
-#define kPlatformKey		"platform"
-#define kACPIKey		"acpi"
-#define kCDROMPromptKey		"CD-ROM Prompt"
-#define kCDROMOptionKey		"CD-ROM Option Key"
-#define kRescanPromptKey	"Rescan Prompt"
-#define kRescanKey		"Rescan"
-#define kScanSingleDriveKey	"Scan Single Drive"
-#define kInsantMenuKey		"Instant Menu"
-#define kDefaultKernel		"mach_kernel"
-#define kGUIKey			"GUI"
-#define kBootBannerKey		"Boot Banner"
-#define kWaitForKeypressKey	"Wait"
-/* AsereBLN: added the other keys */
-#define kUseAtiROM		"UseAtiROM"		/* ati.c */
-#define kWake			"Wake"			/* boot.c */
-#define kForceWake		"ForceWake"		/* boot.c */
-#define kWakeImage		"WakeImage"		/* boot.c */
-#define kProductVersion		"ProductVersion"	/* boot.c */
-#define karch			"arch"			/* boot.c */
-#define kDSDT			"DSDT"			/* dsdt_patcher.c */
-#define kDropSSDT		"DropSSDT"		/* dsdt_patcher.c */
-#define kRestartFix		"RestartFix"		/* dsdt_patcher.c */
-#define kSMBIOS			"SMBIOS"		/* fake_efi.c */
-#define kSystemID		"system-id"		/* fake_efi.c */
-#define kSystemType		"system-type"		/* fake_efi.c */
-#define kUseNvidiaROM		"UseNvidiaROM"		/* nvidia.c */
-#define kVBIOS			"VBIOS"			/* nvidia.c */
-#define kPCIRootUID		"PCIRootUID"		/* pci_root.c */
-#define kEthernetBuiltIn	"EthernetBuiltIn"	/* pci_setup.c */
-#define kGraphicsEnabler	"GraphicsEnabler"	/* pci_setup.c */
-#define kUSBBusFix		"USBBusFix"		/* pci_setup.c */
-#define kEHCIacquire		"EHCIacquire"		/* pci_setup.c */
-#define kUHCIreset		"UHCIreset"		/* pci_setup.c */
-#define kForceHPET		"ForceHPET"		/* pci_setup.c */
-#define kSMBIOSdefaults		"SMBIOSdefaults"	/* smbios_patcher.c */
-#define kEHCIhard		"EHCIhard"		/* usb.c */
-#define kDefaultPartition	"Default Partition"	/* sys.c */
-#define kDeviceProperties	"device-properties"	/* device_inject.c */
-#define kHidePartition		"Hide Partition"	/* disk.c */
-#define kRenamePartition	"Rename Partition"	/* disk.c */
+#define kGraphicsModeKey    "Graphics Mode"
+#define kTextModeKey        "Text Mode"
+#define kQuietBootKey       "Quiet Boot"
+#define kKernelFlagsKey     "Kernel Flags"
+#define kMKextCacheKey      "MKext Cache"
+#define kKernelNameKey      "Kernel"
+#define kKernelCacheKey     "Kernel Cache"
+#define kBootDeviceKey      "Boot Device"
+#define kTimeoutKey         "Timeout"
+#define kRootDeviceKey      "rd"
+#define kBootUUIDKey        "boot-uuid"
+#define kHelperRootUUIDKey  "Root UUID"
+#define kPlatformKey        "platform"
+#define kACPIKey            "acpi"
+#define kCDROMPromptKey     "CD-ROM Prompt"
+#define kCDROMOptionKey     "CD-ROM Option Key"
+#define kRescanPromptKey    "Rescan Prompt"
+#define kRescanKey          "Rescan"
+#define kScanSingleDriveKey "Scan Single Drive"
+#define kInsantMenuKey      "Instant Menu"
+#define kDefaultKernel      "mach_kernel"
+#define kGUIKey             "GUI"
+#define kBootBannerKey      "Boot Banner"
+#define kWaitForKeypressKey "Wait"
 
 /*
  * Flags to the booter or kernel
+ *
  */
-#define kVerboseModeFlag	"-v"
-#define kSafeModeFlag		"-x"
-#define kOldSafeModeFlag	"-f"
-#define kIgnoreBootFileFlag	"-F"
-#define kSingleUserModeFlag	"-s"
-#define k32BitModeFlag		"-x32"
+#define kVerboseModeFlag     "-v"
+#define kSafeModeFlag        "-x"
+#define kOldSafeModeFlag     "-f"
+#define kIgnoreBootFileFlag  "-F"
+#define kSingleUserModeFlag  "-s"
 
 /*
  * Booter behavior control
@@ -109,20 +81,18 @@
  */
 extern int  gBIOSDev;
 extern long gBootMode;
-extern bool sysConfigValid;
+extern BOOL sysConfigValid;
 extern char bootBanner[];
 extern char bootPrompt[];
-extern bool gOverrideKernel;
+extern BOOL gOverrideKernel;
 extern char *gPlatformName;
 extern char gMKextName[];
 extern char gRootDevice[];
-extern bool gEnableCDROMRescan;
-extern bool gScanSingleDrive;
-extern bool useGUI;
+extern BOOL gEnableCDROMRescan;
+extern BOOL gScanSingleDrive;
+extern BOOL useGUI;
 
-/*
- * Boot Modes
- */
+// Boot Modes
 enum {
     kBootModeNormal = 0,
     kBootModeSafe   = 1,
@@ -136,6 +106,7 @@ extern void common_boot(int biosdev);
 /*
  * graphics.c
  */
+
 extern void printVBEModeInfo();
 extern void setVideoMode(int mode, int drawgraphics);
 extern int  getVideoMode();
@@ -177,10 +148,10 @@ extern long (*LoadExtraDrivers_p)(FileLoadDrivers_t FileLoadDrivers_p);
 /*
  * options.c
  */
-extern int getBootOptions(bool firstRun);
+extern int getBootOptions(BOOL firstRun);
 extern int processBootOptions();
 extern int selectAlternateBootDevice(int bootdevice);
-extern bool promptForRescanOption(void);
+extern BOOL promptForRescanOption(void);
 
 void showHelp();
 void showTextFile();
@@ -213,6 +184,7 @@ typedef struct compressed_kernel_header compressed_kernel_header;
 void HibernateBoot(char *boot_device);
 
 /* bmdecompress.c */
-void * DecompressData(void *srcbase, int *dw, int *dh, int *bytesPerPixel);
+void *
+DecompressData(void *srcbase, int *dw, int *dh, int *bytesPerPixel);
 
 #endif /* !__BOOT2_BOOT_H */

@@ -59,9 +59,9 @@ MAXBOOTSIZE = 392704
 all: $(DIRS_NEEDED) boot
 
 embedtheme: CFLAGS += -DEMBED_THEME
-embedtheme: art.h all
+embedtheme: art.h embedded.h all
 
-boot: machOconv embedded.h $(OBJS) $(LIBDEP)
+boot: machOconv $(OBJS) $(LIBDEP)
 	$(LD) -static -Wl,-preload -Wl,-segaddr,__INIT,$(BOOT2ADDR) \
 	        -nostdlib -arch i386 -Wl,-segalign,20 \
 		-o $(SYMROOT)/boot.sys $(filter %.o,$^) $(LIBS) -lcc_kext

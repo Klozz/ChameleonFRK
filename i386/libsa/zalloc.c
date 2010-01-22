@@ -48,7 +48,7 @@ static zmem * zavailable;
 static short  availableNodes, allocedNodes, totalNodes;
 static char * zalloc_base;
 static char * zalloc_end;
-static void   (*zerror)(char *, size_t, const char *, int);
+static void   (*zerror)(char *, size_t);
 
 static void   zallocate(char * start,int size);
 static void   zinsert(zmem * zp, int ndx);
@@ -61,7 +61,7 @@ size_t zalloced_size;
 
 #define ZALLOC_NODES	16384
 
-static void malloc_error(char *addr, size_t size, const char *file, int line)
+static void malloc_error(char *addr, size_t size)
 {
 #ifdef i386
     asm volatile ("hlt");
@@ -69,7 +69,7 @@ static void malloc_error(char *addr, size_t size, const char *file, int line)
 }
 
 // define the block of memory that the allocator will use
-void malloc_init(char * start, int size, int nodes, void (*malloc_err_fn)(char *, size_t, const char *, int))
+void malloc_init(char * start, int size, int nodes, void (*malloc_err_fn)(char *, size_t))
 {
 	zalloc_base         = start ? start : (char *)ZALLOC_ADDR;
 	totalNodes          = nodes ? nodes : ZALLOC_NODES;
@@ -86,7 +86,7 @@ void malloc_init(char * start, int size, int nodes, void (*malloc_err_fn)(char *
 
 #define BEST_FIT 1
 
-void * safe_malloc(size_t size, const char *file, int line)
+void * malloc(size_t size)
 {
 	int    i;
 #if BEST_FIT
@@ -104,7 +104,7 @@ void * safe_malloc(size_t size, const char *file, int line)
 	size = ((size + 0xf) & ~0xf);
 
         if (size == 0) {
-            if (zerror) (*zerror)((char *)0xdeadbeef, 0, file, line);
+            if (zerror) (*zerror)((char *)0xdeadbeef, 0);
         }
 #if BEST_FIT
         smallestSize = 0;
@@ -155,7 +155,7 @@ void * safe_malloc(size_t size, const char *file, int line)
 done:
 	if ((ret == 0) || (ret + size >= zalloc_end))
     {
-		if (zerror) (*zerror)(ret, size, file, line);
+		if (zerror) (*zerror)(ret, size);
     }
 	if (ret != 0)
     {
@@ -204,7 +204,7 @@ void free(void * pointer)
 		}
 	}
 	if ( !found )  {
-            if (zerror) (*zerror)(pointer, rp, "free", 0);
+            if (zerror) (*zerror)(pointer, rp);
             else return;
         }
 #if ZDEBUG
@@ -232,7 +232,7 @@ void free(void * pointer)
 		if ((start + tsize) < zavailable[i].start)
 		{
                         if (++availableNodes > totalNodes) {
-                            if (zerror) (*zerror)((char *)0xf000f000, 0, "free", 0);
+                            if (zerror) (*zerror)((char *)0xf000f000, 0);
                         }
 			zinsert(zavailable, i); 
 			zavailable[i].start = start;
@@ -242,7 +242,7 @@ void free(void * pointer)
 	}
 
         if (++availableNodes > totalNodes) {
-            if (zerror) (*zerror)((char *)0xf000f000, 1, "free", 0);
+            if (zerror) (*zerror)((char *)0xf000f000, 1);
         }
 	zavailable[i].start = start;
 	zavailable[i].size  = tsize;
@@ -260,7 +260,7 @@ zallocate(char * start,int size)
 	zalloced[allocedNodes].start = start;
 	zalloced[allocedNodes].size  = size;
 	if (++allocedNodes > totalNodes) {
-            if (zerror) (*zerror)((char *)0xf000f000, 2, "zallocate", 0);
+            if (zerror) (*zerror)((char *)0xf000f000, 2);
         };
 }
 
@@ -315,7 +315,7 @@ zcoalesce(void)
 /* This is the simplest way possible.  Should fix this. */
 void * realloc(void * start, size_t newsize)
 {
-    void * newstart = safe_malloc(newsize, __FILE__, __LINE__);
+    void * newstart = malloc(newsize);
     bcopy(start, newstart, newsize);
     free(start);
     return newstart;

@@ -30,4 +30,4 @@ extern void HFSGetDescription(CICell ih, char *str, long strMaxLen);
 extern long HFSGetFileBlock(CICell ih, char *str, unsigned long long *firstBlock);
 extern long HFSGetUUID(CICell ih, char *uuidStr);
 extern void HFSFree(CICell ih);
-extern bool HFSProbe (const void *buf);
+extern BOOL HFSProbe (const void *buf);
