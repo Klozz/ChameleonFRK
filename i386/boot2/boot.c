@@ -58,6 +58,8 @@
 #include "ramdisk.h"
 #include "gui.h"
 #include "platform.h"
+#include "edid.h"
+#include "915resolution.h"
 
 long gBootMode; /* defaults to 0 == kBootModeNormal */
 bool gOverrideKernel;
@@ -316,9 +318,34 @@ void common_boot(int biosdev)
     getc();
 #endif
 
+	
     useGUI = true;
     // Override useGUI default
     getBoolForKey(kGUIKey, &useGUI, &bootInfo->bootConfig);
+
+	// Before initGui, path the video bios with the correct resolution
+	
+	UInt32 x = 0, y = 0; 
+	UInt32 bp = 0;
+	
+	getResolution(&x, &y, &bp);	
+
+	if (x!=0 && y!=0) {
+		vbios_map * map;
+		
+		map = open_vbios(CT_UNKWN);
+		
+		unlock_vbios(map);
+		
+		set_mode(map, x, y, bp, 0, 0);
+		
+		relock_vbios(map);
+		
+		close_vbios(map);
+		
+		verbose("Patched first resolution mode to %dx%d.\n", x, y);
+	}
+	
     if (useGUI) {
         /* XXX AsereBLN handle error */
 	initGUI();
@@ -412,6 +439,9 @@ void common_boot(int biosdev)
 		}
 		if (getValueForKey(k32BitModeFlag, &val, &len, &bootInfo->bootConfig)) {
 			archCpuType = CPU_TYPE_I386;
+		}
+		if (getValueForKey(k64BitModeFlag, &val, &len, &bootInfo->bootConfig)) {
+			archCpuType = CPU_TYPE_X86_64;
 		}
 		
 		if (!getBoolForKey (kWake, &tryresume, &bootInfo->bootConfig)) {

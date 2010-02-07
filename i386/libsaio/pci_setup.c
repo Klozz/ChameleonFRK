@@ -4,19 +4,21 @@
 #include "pci.h"
 #include "nvidia.h"
 #include "ati.h"
+#include "gma.h"
 
 extern void set_eth_builtin(pci_dt_t *eth_dev);
 extern int ehci_acquire(pci_dt_t *pci_dev);
+extern int legacy_off(pci_dt_t *pci_dev);
 extern int uhci_reset(pci_dt_t *pci_dev);
 extern void force_enable_hpet(pci_dt_t *lpc_dev);
 
 void setup_pci_devs(pci_dt_t *pci_dt)
 {
 	char *devicepath;
-	bool do_eth_devprop, do_gfx_devprop, fix_ehci, fix_uhci, fix_usb, do_enable_hpet;
+	bool do_eth_devprop, do_gfx_devprop, fix_ehci, fix_legoff, fix_uhci, fix_usb, do_enable_hpet;
 	pci_dt_t *current = pci_dt;
 
-	do_eth_devprop = do_gfx_devprop = fix_ehci = fix_uhci = fix_usb = do_enable_hpet = false;
+	do_eth_devprop = do_gfx_devprop = fix_ehci = fix_legoff = fix_uhci = fix_usb = do_enable_hpet = false;
 
 	getBoolForKey(kEthernetBuiltIn, &do_eth_devprop, &bootInfo->bootConfig);
 	getBoolForKey(kGraphicsEnabler, &do_gfx_devprop, &bootInfo->bootConfig);
@@ -26,6 +28,7 @@ void setup_pci_devs(pci_dt_t *pci_dt)
 		getBoolForKey(kEHCIacquire, &fix_ehci, &bootInfo->bootConfig);
 		getBoolForKey(kUHCIreset, &fix_uhci, &bootInfo->bootConfig);
 	}
+	getBoolForKey(kUSBLegacyOff, &fix_legoff, &bootInfo->bootConfig);
 	getBoolForKey(kForceHPET, &do_enable_hpet, &bootInfo->bootConfig);
 
 	while (current)
@@ -50,11 +53,11 @@ void setup_pci_devs(pci_dt_t *pci_dt)
 							break;
 					
 						case PCI_VENDOR_ID_INTEL: 
-							/* message to be removed once support for these cards is added */
-							verbose("Intel VGA Controller [%04x:%04x] :: %s (currently NOT SUPPORTED)\n", 
-								current->vendor_id, current->device_id, devicepath);
+							verbose("Intel Graphics Controller [%04x:%04x] :: %s \n",
+							current->vendor_id, current->device_id, devicepath);
+							setup_gma_devprop(current);
 							break;
-					
+							
 						case PCI_VENDOR_ID_NVIDIA: 
 							setup_nvidia_devprop(current);
 							break;
@@ -68,6 +71,8 @@ void setup_pci_devs(pci_dt_t *pci_dt)
 					case 0x20:
 				    	if (fix_ehci)
 							ehci_acquire(current);
+						if (fix_legoff)
+							legacy_off(current);
 						break;
 
 					/* UHCI */

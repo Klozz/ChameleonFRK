@@ -49,7 +49,6 @@ int getPciRootUID(void)
 	const char *val;
 	int len,fsize;
 	const char * dsdt_filename=NULL;
-	extern int search_and_get_acpi_fd(const char *, const char **);
 
 	if (rootuid < 10) return rootuid;
 	rootuid = 0;	/* default uid = 0 */

@@ -71,6 +71,7 @@ Options useful in the com.apple.Boot.plist file:
                           for ethernet interfaces.
 
   USBBusFix=Yes           Enable the EHCI and UHCI fixes (disabled by default).
+  USBLegacyOff=Yes        Enable the force USB legacy off fix (disabled by default).
   EHCIacquire=Yes         Enable the EHCI fix (disabled by default).
   UHCIreset=Yes           Enable the UHCI fix (disabled by default).
   ForceHPET=Yes|No        Force Enable HPET.
@@ -80,9 +81,43 @@ Options useful in the com.apple.Boot.plist file:
   WakeImage=<file>        Use an alternate sleepimage file. 
                             (default path is /private/var/vm/sleepimage).
 
+  UpdateACPI=Yes          Upgrade automatically ACPI V1 tables to ACPI V4 tables.
   DropSSDT=Yes            Skip the SSDT tables while relocating the ACPI tables.
+  DropHPET=Yes            Skip the HPET table while relocating the ACPI tables.
+  DropSLIC=Yes            Skip the SLIC table while relocating the ACPI tables.
+  DropSBST=Yes            Skip the SBST table while relocating the ACPI tables.
+  DropECDT=Yes            Skip the ECDT table while relocating the ACPI tables.
+  DropASFT=Yes            Skip the ASF! table while relocating the ACPI tables.
+  DropDMAR=Yes            Skip the DMAR table while relocating the ACPI tables.
+  oemDSDT=Yes             Use the standard DSDT and ACPI tables.
+  oemSSDT=Yes             Use the standard SSDT tables.
+  oemHPET=Yes             Use the standard HPET table.
+  oemSBST=Yes             Use the standard SBST table.
+  oemECDT=Yes             Use the standard ECDT table.
+  oemASFT=Yes             Use the standard ASF! table.
+  oemDMAR=Yes             Use the standard DMAR table.
+  oemAPIC=Yes             Use the standard APIC table.
+  oemMCFG=Yes             Use the standard MCFG table.
   DSDT=<file>             Use an alternate DSDT.aml file 
                             (default path: /DSDT.aml /Extra/DSDT.aml).
+  SSDT=<file_prefix>      Use alternative DSDT-X.aml file prefix
+                            (default prefix: /SSDT /Extra/SSDT).
+  HPET=<file>             Use an alternate HPET.aml file 
+                            (default path: /HPET.aml /Extra/HPET.aml).
+  SBST=<file>             Use an alternate SBST.aml file 
+                            (default path: /SBST.aml /Extra/SBST.aml).
+  ECDT=<file>             Use an alternate ECDT.aml file 
+                            (default path: /ECDT.aml /Extra/ECDT.aml).
+  ASFT=<file>             Use an alternate ASFT.aml file 
+                            (default path: /ASFT.aml /Extra/ASFT.aml).
+  DMAR=<file>             Use an alternate DMAR.aml file 
+                            (default path: /DMAR.aml /Extra/DMAR.aml).
+  APIC=<file>             Use an alternate APIC.aml file 
+                            (default path: /APIC.aml /Extra/APIC.aml).
+  MCFG=<file>             Use an alternate MCFG.aml file 
+                            (default path: /MCFG.aml /Extra/MCFG.aml).
+  FADT=<file>             Use an alternate FADT.aml file 
+                            (default path: /FADT.aml /Extra/FADT.aml).
 
   SMBIOS=<file>           Use an alternate smbios.plist file 
                             (default path: /smbios.plist /Extra/smbios.plist

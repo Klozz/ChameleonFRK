@@ -11,6 +11,7 @@
 #include "gui.h"
 #include "appleboot.h"
 #include "vers.h"
+#include "edid.h"
 
 //#define EMBED_THEME
 
@@ -553,7 +554,7 @@ void loadThemeValues(config_file_t *theme, bool overide)
  
 int initGUI(void)
 {
-	int		val;
+	/*int		val;*/
 #ifdef EMBED_THEME
 	config_file_t	*config;
 	
@@ -574,14 +575,9 @@ int initGUI(void)
 		return 1;
 	}
 #endif
-	// parse display size parameters
-	if (getIntForKey("screen_width", &val, &bootInfo->themeConfig)) {
-		screen_params[0] = val;
-	}
-	if (getIntForKey("screen_height", &val, &bootInfo->themeConfig)) {
-		screen_params[1] = val;
-	}
-	screen_params[2] = 32;
+
+	// determine screen params from edid
+	getResolution(&screen_params[0], &screen_params[1], &screen_params[2]);
 
 	// Initalizing GUI strucutre.
 	bzero(&gui, sizeof(gui_t));
@@ -1683,19 +1679,22 @@ static void loadBootGraphics(void)
 // drawBootGraphics
 void drawBootGraphics(void)
 {
-	int pos;
+	/*int pos;*/
 	int length;
 	const char *dummyVal;
 	bool legacy_logo;
 	uint16_t x, y; 
-	
+
+	/** Read default resolution from the graphics card, instead of the theme **/
+	getResolution(&screen_params[0], &screen_params[1], &screen_params[2]);
+
 	if (getBoolForKey("Legacy Logo", &legacy_logo, &bootInfo->bootConfig) && legacy_logo) {
 		usePngImage = false; 
 	} else if (bootImageData == NULL) {
 		loadBootGraphics();
 	}
 
-	// parse screen size parameters
+	/*// parse screen size parameters
 	if (getIntForKey("boot_width", &pos, &bootInfo->themeConfig)) {
 		screen_params[0] = pos;
 	} else {
@@ -1706,7 +1705,7 @@ void drawBootGraphics(void)
 	} else {
 		screen_params[1] = DEFAULT_SCREEN_HEIGHT;
 	}
-	screen_params[2] = 32;
+	screen_params[2] = 32;*/
 
 	gui.screen.width = screen_params[0];
 	gui.screen.height = screen_params[1];

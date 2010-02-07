@@ -64,6 +64,21 @@ rmwi (int port, int index, int clear, int set)
  */
 static biosBuf_t bb;
 
+int getEDID( void * edidBlock, UInt8 block)
+{
+	bzero(&bb, sizeof(bb));
+    bb.intno  = 0x10;
+    bb.eax.rr = funcGetEDID;
+	bb.ebx.r.l= 0x01;
+	bb.edx.rr = block;
+	
+    bb.es     = SEG( edidBlock );
+    bb.edi.rr = OFF( edidBlock );
+	
+    bios( &bb );
+    return(bb.eax.r.h);
+}
+
 int getVBEInfo( void * infoBlock )
 {
     bb.intno  = 0x10;

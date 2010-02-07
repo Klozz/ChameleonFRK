@@ -28,3 +28,6 @@
 - Merged with asere patch, while keeping my fake_efi.c changes, and adding a new 
   stringForKey() API, also changed the DT__XXXX() set of functions 
   to handle const char * values instead of char*.
+- Added full ACPI tables override.
+- Added ACPI V1 to V4 conversion, also auto generates XSDT from RSDT if needed.
+- Added force USB legacy off patch.
