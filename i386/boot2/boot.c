@@ -58,6 +58,8 @@
 #include "ramdisk.h"
 #include "gui.h"
 #include "platform.h"
+#include "edid.h"
+#include "autoresolution.h"
 
 long gBootMode; /* defaults to 0 == kBootModeNormal */
 bool gOverrideKernel;
@@ -78,6 +80,7 @@ BVRef   bvr;
 BVRef   menuBVR;
 BVRef   bvChain;
 bool    useGUI;
+bool    autoResolution;
 
 //static void selectBiosDevice(void);
 static unsigned long Adler32(unsigned char *buffer, long length);
@@ -132,7 +135,7 @@ static int ExecKernel(void *binary)
 {
     entry_t                   kernelEntry;
     int                       ret;
-
+	
     bootArgs->kaddr = bootArgs->ksize = 0;
 
     ret = DecodeKernel(binary,
@@ -158,11 +161,12 @@ static int ExecKernel(void *binary)
         printf("Errors encountered while starting up the computer.\n");
         printf("Pausing %d seconds...\n", kBootErrorTimeout);
         sleep(kBootErrorTimeout);
-    }
-
+    }		
+	
+	
     setupFakeEfi();
-
-    verbose("Starting Darwin %s\n",( archCpuType == CPU_TYPE_I386 ) ? "x86" : "x86_64");
+	
+	verbose("Starting Darwin %s\n",( archCpuType == CPU_TYPE_I386 ) ? "x86" : "x86_64");
 
     // Cleanup the PXE base code.
 
@@ -316,9 +320,54 @@ void common_boot(int biosdev)
     getc();
 #endif
 
-    useGUI = true;
-    // Override useGUI default
-    getBoolForKey(kGUIKey, &useGUI, &bootInfo->bootConfig);
+	
+	useGUI = TRUE;
+	// Override useGUI default
+	getBoolForKey(kGUIKey, &useGUI, &bootInfo->bootConfig);
+ 	
+ 	// Before initGui, patch the video bios with the correct resolution
+ 	
+ 	UInt32 params[4];
+ 	int count;
+ 	params[3] = 0;
+ 	
+	
+ 	autoResolution = TRUE;
+ 	// Override AutoResolution default
+ 	getBoolForKey(kAutoResolutionKey, &autoResolution, &bootInfo->bootConfig);
+ 	
+	vbios_map * map = open_vbios(CT_UNKWN);
+	//Saving the bios in case we have to unpatch it
+	save_vbios(map);
+	
+ 	if (autoResolution == TRUE) {
+		//Get Resolution from Graphics Mode key
+ 		count = getNumberArrayFromProperty(kGraphicsModeKey, params, 4);
+ 		if ( count < 3 ){
+			//If no Graphics Mode key, get from EDID
+ 			getResolution(&params[0], &params[1], &params[2]);
+			verbose("EDID Resolution: %dx%d\n",params[0], params[1]);
+ 		}
+	} else {
+ 			if ( params[2] == 256 ) params[2] = 8;
+ 			if ( params[2] == 555 ) params[2] = 16;
+ 			if ( params[2] == 888 ) params[2] = 32;
+	}
+ 		
+	if (params[0]!=0 && params[1]!=0) {	
+  			
+  			unlock_vbios(map);
+  			
+			patch_vbios(map, params[0], params[1], params[2], 0, 0);
+  			
+  			relock_vbios(map);
+			#if DEBUG			
+				printf("Press Any Key...\n");
+			 	getc();
+			#endif
+	}
+ 	
+		
     if (useGUI) {
         /* XXX AsereBLN handle error */
 	initGUI();
@@ -388,6 +437,50 @@ void common_boot(int biosdev)
 			gui.infobox.draw = false;
 			drawBackground();
 			updateVRAM();
+		}
+		
+		/*
+		 * AutoResolution - Reapply the patch or cancel if Graphics Mode was incorrect
+		 *                  or EDID Info was insane
+		 */	
+	     getBoolForKey(kAutoResolutionKey, &autoResolution, &bootInfo->bootConfig);
+		
+		//Restore the vbios for Cancelation
+		if ((autoResolution == FALSE) && map) {
+			
+			unlock_vbios(map);
+			
+			restore_vbios(map);
+			
+			relock_vbios(map);
+			
+			close_vbios(map);
+			
+		} 
+		if ((autoResolution == TRUE) && map) {
+			//Reapply patch in case resolution have changed
+			
+			count = getNumberArrayFromProperty(kGraphicsModeKey, params, 4);
+			if ( count < 3 ) {
+				getResolution(&params[0], &params[1], &params[2]);
+			}
+			else 
+			{
+				if ( params[2] == 256 ) params[2] = 8;
+				if ( params[2] == 555 ) params[2] = 16;
+				if ( params[2] == 888 ) params[2] = 32;
+			}
+			
+			if (params[0]!=0 && params[1]!=0) {
+				
+				unlock_vbios(map);
+				
+				patch_vbios(map, params[0], params[1], params[2], 0, 0);
+				
+				relock_vbios(map);
+				
+				close_vbios(map);
+			}
 		}
 		
 		// Find out which version mac os we're booting.

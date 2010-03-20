@@ -88,6 +88,7 @@
 #define kRenamePartition	"Rename Partition"	/* disk.c */
 #define kUseMemDetect	        "UseMemDetect"	        /* platform.c */
 #define kRestartFix             "RestartFix"        /* dsdt_patcher.c */
+#define kAutoResolutionKey	"AutoResolution" /* Azi: not present on lebibou diff */
 
 /*
  * Flags to the booter or kernel
@@ -121,6 +122,7 @@ extern char gRootDevice[];
 extern bool gEnableCDROMRescan;
 extern bool gScanSingleDrive;
 extern bool useGUI;
+extern bool autoResolution;
 
 /*
  * Boot Modes

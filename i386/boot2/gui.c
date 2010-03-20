@@ -11,6 +11,8 @@
 #include "gui.h"
 #include "appleboot.h"
 #include "vers.h"
+#include "edid.h"
+#include "autoresolution.h"
 
 #define THEME_NAME_DEFAULT	"Default"
 static const char *theme_name = THEME_NAME_DEFAULT;	
@@ -556,7 +558,7 @@ void loadThemeValues(config_file_t *theme, bool overide)
  
 int initGUI(void)
 {
-	int		val;
+	int val, count;
 #ifdef EMBED_THEME
 	config_file_t	*config;
 	
@@ -567,7 +569,8 @@ int initGUI(void)
 #else
 	int	len;
 	char	dirspec[256];
-
+	
+	// find theme name in boot.plist
 	getValueForKey( "Theme", &theme_name, &len, &bootInfo->bootConfig );
 	if ((strlen(theme_name) + 27) > sizeof(dirspec)) {
 		return 1;
@@ -577,19 +580,35 @@ int initGUI(void)
 		return 1;
 	}
 #endif
-	// parse display size parameters
-	if (getIntForKey("screen_width", &val, &bootInfo->themeConfig)) {
-		screen_params[0] = val;
-	}
-	if (getIntForKey("screen_height", &val, &bootInfo->themeConfig)) {
-		screen_params[1] = val;
-	}
+	/*
+	* AutoResolution
+	*/
+	if (autoResolution == TRUE) {//Get Resolution from Graphics Mode key
+		 		count = getNumberArrayFromProperty(kGraphicsModeKey, screen_params, 4);
+				if ( count < 3 ) {
+					//If no Graphics Mode key, get it from EDID
+					getResolution(&screen_params[0], &screen_params[1], &screen_params[2]);
+				}
+ 	} else {
+ 		// parse screen size parameters
+ 		if(getIntForKey("screen_width", &val, &bootInfo->themeConfig))
+ 			screen_params[0] = val;
+ 		else
+ 			screen_params[0] = DEFAULT_SCREEN_WIDTH;
+ 		
+ 		if(getIntForKey("screen_height", &val, &bootInfo->themeConfig))
+ 			screen_params[1] = val;
+ 		else
+ 			screen_params[1] = DEFAULT_SCREEN_HEIGHT;
+ 	}
+	
 	screen_params[2] = 32;
 
 	// Initalizing GUI strucutre.
 	bzero(&gui, sizeof(gui_t));
 	
 	// find best matching vesa mode for our requested width & height
+	loadConfigFile(dirspec, &bootInfo->themeConfig);
 	getGraphicModeParams(screen_params);
 
 	// set our screen structure with the mode width & height
@@ -748,6 +767,10 @@ void drawDeviceList (int start, int end, int selection)
 			dprintf( &gui.screen, "name      %s\n",   param->name );
 			dprintf( &gui.screen, "type_name %s\n",   param->type_name );
 			dprintf( &gui.screen, "modtime   %d\n",   param->modTime );
+			dprintf(&gui.screen,  "width    %d\n",  gui.screen.width);
+			dprintf(&gui.screen,  "height   %d\n",  gui.screen.height);
+			dprintf(&gui.screen,  "attr:    0x%x\n", gui.screen.attr);
+			dprintf(&gui.screen,  "mm:      %d\n",   gui.screen.mm);
 #endif
 		}
 		
@@ -1686,7 +1709,7 @@ static void loadBootGraphics(void)
 void drawBootGraphics(void)
 {
 	int pos;
-	int length;
+	int length, count;
 	const char *dummyVal;
 	bool legacy_logo;
 	uint16_t x, y; 
@@ -1697,17 +1720,31 @@ void drawBootGraphics(void)
 		loadBootGraphics();
 	}
 
-	// parse screen size parameters
-	if (getIntForKey("boot_width", &pos, &bootInfo->themeConfig)) {
-		screen_params[0] = pos;
+	/*
+ 	 * AutoResolution
+ 	 */
+ 	if (autoResolution == TRUE) {
+ 		//Get Resolution from Graphics Mode key
+ 		count = getNumberArrayFromProperty(kGraphicsModeKey, screen_params, 4);
+ 		if ( count < 3 ) {
+ 			//If no Graphics Mode key, get resolution from EDID
+ 			getResolution(&screen_params[0], &screen_params[1], &screen_params[2]);
+ 		}
+		
+		
 	} else {
-		screen_params[0] = DEFAULT_SCREEN_WIDTH;
-	}
-	if (getIntForKey("boot_height", &pos, &bootInfo->themeConfig)) {
-		screen_params[1] = pos;
-	} else {
-		screen_params[1] = DEFAULT_SCREEN_HEIGHT;
-	}
+ 		// parse screen size parameters
+ 		if(getIntForKey("boot_width", &pos, &bootInfo->themeConfig))
+ 			screen_params[0] = pos;
+ 		else
+ 			screen_params[0] = DEFAULT_SCREEN_WIDTH;
+ 		
+ 		if(getIntForKey("boot_height", &pos, &bootInfo->themeConfig))
+ 			screen_params[1] = pos;
+ 		else
+ 			screen_params[1] = DEFAULT_SCREEN_HEIGHT;
+ 	}
+	
 	screen_params[2] = 32;
 
 	gui.screen.width = screen_params[0];
