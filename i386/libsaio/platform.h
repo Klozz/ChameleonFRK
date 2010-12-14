@@ -1,7 +1,7 @@
 /*
  *  platform.h
  *  AsereBLN: reworked and extended
- *
+ *	valv: further additions
  */
 
 #ifndef __LIBSAIO_PLATFORM_H
@@ -13,6 +13,11 @@ extern bool platformCPUFeature(uint32_t);
 extern void scan_platform(void);
 extern void dumpPhysAddr(const char * title, void * a, int len);
 
+#define bit(n)			(1UL << (n))
+#define bitmask(h,l)		((bit(h)|(bit(h)-1)) & ~(bit(l)-1))
+#define bitfield(x,h,l)		(((x) & bitmask(h,l)) >> l)
+
+
 /* CPUID index into cpuid_raw */
 #define CPUID_0				0
 #define CPUID_1				1
@@ -23,29 +28,30 @@ extern void dumpPhysAddr(const char * title, void * a, int len);
 #define CPUID_81			6
 #define CPUID_MAX			7
 
-#define CPU_MODEL_YONAH			0x0E
-#define CPU_MODEL_MEROM			0x0F
-#define CPU_MODEL_PENRYN		0x17
-#define CPU_MODEL_NEHALEM		0x1A
-#define CPU_MODEL_ATOM			0x1C
-#define CPU_MODEL_FIELDS		0x1E	/* Lynnfield, Clarksfield, Jasper */
-#define CPU_MODEL_DALES			0x1F	/* Havendale, Auburndale */
-#define CPU_MODEL_DALES_32NM	0x25	/* Clarkdale, Arrandale */
-#define CPU_MODEL_WESTMERE		0x2C	/* Gulftown, Westmere-EP, Westmere-WS */
-#define CPU_MODEL_NEHALEM_EX	0x2E
-#define CPU_MODEL_WESTMERE_EX	0x2F
-
 /* CPU Features */
-#define CPU_FEATURE_MMX			0x00000001		// MMX Instruction Set
-#define CPU_FEATURE_SSE			0x00000002		// SSE Instruction Set
-#define CPU_FEATURE_SSE2		0x00000004		// SSE2 Instruction Set
-#define CPU_FEATURE_SSE3		0x00000008		// SSE3 Instruction Set
-#define CPU_FEATURE_SSE41		0x00000010		// SSE41 Instruction Set
-#define CPU_FEATURE_SSE42		0x00000020		// SSE42 Instruction Set
-#define CPU_FEATURE_EM64T		0x00000040		// 64Bit Support
-#define CPU_FEATURE_HTT			0x00000080		// HyperThreading
-#define CPU_FEATURE_MOBILE		0x00000100		// Mobile CPU
-#define CPU_FEATURE_MSR			0x00000200		// MSR Support
+// NOTE: These are currently mapped to the actual bit in the cpuid value
+#define CPU_FEATURE_MMX			bit(23)		// MMX Instruction Set
+#define CPU_FEATURE_SSE			bit(25)		// SSE Instruction Set
+#define CPU_FEATURE_SSE2		bit(26)		// SSE2 Instruction Set
+#define CPU_FEATURE_SSE3		bit(0)		// SSE3 Instruction Set
+#define CPU_FEATURE_SSE41		bit(19)		// SSE41 Instruction Set
+#define CPU_FEATURE_SSE42		bit(20)		// SSE42 Instruction Set
+#define CPU_FEATURE_EM64T		bit(29)		// 64Bit Support
+#define CPU_FEATURE_HTT			bit(28)		// HyperThreading
+#define CPU_FEATURE_MSR			bit(5)		// MSR Support
+#define CPU_FEATURE_APIC		bit(9)		// On-chip APIC Hardware
+#define CPU_FEATURE_EST			bit(7)		// Enhanced Intel SpeedStep
+#define CPU_FEATURE_TM2			bit(8)		// Thermal Monitor 2
+#define CPU_FEATURE_TM1			bit(29)		// Thermal Monitor 1
+#define CPU_FEATURE_SSSE3		bit(9)		// Supplemental SSE3 Instruction Set
+#define CPU_FEATURE_xAPIC		bit(21)		// Extended APIC Mode
+#define CPU_FEATURE_ACPI		bit(22)		// Thermal Monitor and Software Controlled Clock
+#define CPU_FEATURE_LAHF		bit(20)		// LAHF/SAHF Instructions
+#define CPU_FEATURE_XD			bit(20)		// Execute Disable
+
+// NOTE: Determine correct bit for below (28 is already in use)
+#define CPU_FEATURE_MOBILE		bit(1)		// Mobile CPU
+
 
 /* SMBIOS Memory Types */ 
 #define SMB_MEM_TYPE_UNDEFINED	0
@@ -103,24 +109,33 @@ typedef struct _RamSlotInfo_t {
 
 typedef struct _PlatformInfo_t {
 	struct CPU {
-		uint32_t		Features;		// CPU Features like MMX, SSE2, VT, MobileCPU
-		uint32_t		Vendor;			// Vendor
-		uint32_t		Signature;		// Signature
-		uint32_t		Stepping;		// Stepping
-		uint32_t		Model;			// Model
-		uint32_t		ExtModel;		// Extended Model
-		uint32_t		Family;			// Family
-		uint32_t		ExtFamily;		// Extended Family
-		uint32_t		NoCores;		// No Cores per Package
-		uint32_t		NoThreads;		// Threads per Package
-		uint8_t			MaxCoef;		// Max Multiplier
-		uint8_t			MaxDiv;
-		uint8_t			CurrCoef;		// Current Multiplier
-		uint8_t			CurrDiv;
-		uint64_t		TSCFrequency;		// TSC Frequency Hz
-		uint64_t		FSBFrequency;		// FSB Frequency Hz
-		uint64_t		CPUFrequency;		// CPU Frequency Hz
-		char			BrandString[48];	// 48 Byte Branding String
+		uint32_t		Features;				// CPU Features like MMX, SSE2, VT, MobileCPU
+		uint32_t		Vendor;					// Vendor
+		uint32_t		Signature;				// Signature
+		uint32_t		Stepping;				// Stepping
+		uint32_t		Model;					// Model
+		uint32_t		Type;					// Processor Type
+		uint32_t		ExtModel;				// Extended Model
+		uint32_t		Family;					// Family
+		uint32_t		ExtFamily;				// Extended Family
+		uint32_t		NoCores;				// No Cores per Package
+		uint32_t		NoThreads;				// Threads per Package
+		uint8_t			MaxDiv;					// Max Halving ID
+		uint8_t			CurrDiv;				// Current Halving ID
+		uint64_t		TSCFrequency;			// TSC Frequency Hz
+		uint64_t		FSBFrequency;			// FSB Frequency Hz
+		uint64_t		CPUFrequency;			// CPU Frequency Hz
+		uint32_t		MaxRatio;				// Max Bus Ratio
+		uint32_t		MinRatio;				// Min Bus Ratio
+		uint8_t			Tone;					// Turbo Ratio limit (1 core)
+		uint8_t			Ttwo;					// Turbo Ratio limit (2 cores)
+		uint8_t			Tthr;					// Turbo Ratio limit (3 cores)
+		uint8_t			Tfor;					// Turbo Ratio limit (4 cores)
+		bool			ISerie;					// Intel's Core-i model
+		bool			Turbo;					// Intel's Turbo Boost support
+		uint8_t			SLFM;					// Dynamic FSB
+		uint8_t			EST;					// Enhanced SpeedStep
+		char			BrandString[48];		// 48 Byte Branding String
 		uint32_t		CPUID[CPUID_MAX][4];	// CPUID 0..4, 80..81 Raw Values
 	} CPU;
 
@@ -143,7 +158,9 @@ typedef struct _PlatformInfo_t {
 		int			MemoryModules;		// number of memory modules installed
 		int			DIMM[MAX_RAM_SLOTS];	// Information and SPD mapping for each slot
 	} DMI;
+
 	uint8_t				Type;			// System Type: 1=Desktop, 2=Portable... according ACPI2.0 (FACP: PM_Profile)
+
 } PlatformInfo_t;
 
 extern PlatformInfo_t Platform;

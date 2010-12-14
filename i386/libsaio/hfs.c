@@ -268,7 +268,7 @@ long HFSReadFile(CICell ih, char * filePath, void *base, uint64_t offset,  uint6
     long dirID, result, flags;
 
     if (HFSInitPartition(ih) == -1) return -1;
-    
+
     dirID = kHFSRootFolderID;
     // Skip a lead '\'.  Start in the system folder if there are two.
     if (filePath[0] == '/') {
@@ -300,9 +300,12 @@ long HFSReadFile(CICell ih, char * filePath, void *base, uint64_t offset,  uint6
     }
 
     getDeviceDescription(ih, devStr);
-    verbose("Read HFS%s file: [%s/%s] %d bytes.\n",
-            (gIsHFSPlus ? "+" : ""), devStr, filePath, (uint32_t)length);
-	
+
+    /*if (strstr(filePath, ".plist")) verbose("LoadConfig: [%s/%s] %d bytes.\n", devStr, filePath, (uint32_t)length);*/
+    if (strstr(filePath, "com.apple.Boot.plist")) verbose("Config: [%s/%s] %d bytes.\n", devStr, filePath, (uint32_t)length);
+    if (strstr(filePath, "theme.plist")) verbose("Theme: [%s].\n", devStr);
+    if (strstr(filePath, "smbios.plist")) verbose("SMBios: [%s/%s] %d bytes.\n", devStr, filePath, (uint32_t)length);
+    if (strstr(filePath, ".aml")) verbose("ACPI: [%s/%s] %d bytes.\n", devStr, filePath, (uint32_t)length);
     return length;
 }
 

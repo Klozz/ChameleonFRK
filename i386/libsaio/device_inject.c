@@ -31,7 +31,8 @@ uint32_t stringlength = 0;
 
 char *efi_inject_get_devprop_string(uint32_t *len)
 {
-	if(string) {
+	if(string)
+	{
 		*len = string->length;
 		return devprop_generate_string(string);
 	}

@@ -139,17 +139,22 @@ void HibernateBoot(char *image_filename)
 	mem_base = getmemorylimit() - allocSize;//TODO: lower this
 		
 	printf("mem_base %x\n", mem_base);
-	// Rek : hibernate fix 
-	if (!((long long)mem_base+allocSize<1024*bootInfo->extmem+0x100000))
+	/* Rek : hibernate fix
+	if (!((long long)mem_base+allocSize<1024*bootInfo->extmem+0x100000))*/
+
+	// valv: hibfix ;)
+	long long hibfix;
+	hibfix = mem_base+allocSize<1024*bootInfo->extmem+0x100000;
+	if(!hibfix)
 	{
 		printf ("Not enough space to restore image. Press any key to proceed with normal boot.\n");
 		getc ();
 		return;
 	}
-		
+
 	bcopy(header, (void *) mem_base, sizeof(IOHibernateImageHeader));
 	header = (IOHibernateImageHeader *) mem_base;
-		
+
 	imageSize -= sizeof(IOHibernateImageHeader);
 	buffer = (long)(header + 1);
 	
@@ -169,7 +174,7 @@ void HibernateBoot(char *image_filename)
 							  imageSize-(preview_offset+header->previewSize));
 		previewTotalSectors = 0;
 		previewLoadedSectors = 0;
-		previewSaveunder = 0;		
+		previewSaveunder = 0;
 #if 0
 		AsereBLN:
 		check_vga_nvidia() didn't work as expected (recursion level > 0 & return value).

@@ -1,6 +1,7 @@
 /*
  * Copyright 2008 Islam Ahmed Zaid. All rights reserved.  <azismed@gmail.com>
  * AsereBLN: 2009: cleanup and bugfix
+ * valv:     2010: fine-tuning and additions
  */
 
 #ifndef __LIBSAIO_CPU_H
@@ -16,13 +17,19 @@ extern void scan_cpu(PlatformInfo_t *);
 
 #define CPU_STRING_UNKNOWN		"Unknown CPU Typ"
 
-#define	MSR_IA32_PERF_STATUS	0x198
-#define MSR_IA32_PERF_CONTROL	0x199
-#define MSR_IA32_EXT_CONFIG		0x00EE
-#define MSR_FLEX_RATIO			0x194
-#define	MSR_PLATFORM_INFO		0xCE
-#define K8_FIDVID_STATUS		0xC0010042
-#define K10_COFVID_STATUS		0xC0010071
+#define MSR_FSB_FREQ            0xCD
+#define MSR_TURBO_RATIO_LIMIT   0x1AD
+#define MSR_IA32_PLATFORM_ID    0x17
+#define	MSR_IA32_PERF_STATUS    0x198
+#define MSR_IA32_PERF_CONTROL   0x199
+#define MSR_IA32_EXT_CONFIG     0xEE
+#define MSR_FLEX_RATIO          0x194
+#define	MSR_PLATFORM_INFO       0xCE
+#define MSR_IA32_MISC_ENABLE    0x1A0
+#define MSR_THERMAL_STATUS      0x19C
+#define MSR_THERMAL_TARGET      0x01A2
+#define K8_FIDVID_STATUS        0xC0010042
+#define K10_COFVID_STATUS       0xC0010071
 
 #define DEFAULT_FSB		100000          /* for now, hardcoding 100MHz for old CPUs */
 
@@ -50,6 +57,32 @@ static inline uint64_t rdmsr64(uint32_t msr)
 static inline void wrmsr64(uint32_t msr, uint64_t val)
 {
 	__asm__ volatile("wrmsr" : : "c" (msr), "A" (val));
+}
+
+typedef struct msr_struct
+{
+	unsigned lo;
+	unsigned hi;
+} msr_t;
+
+static inline __attribute__((always_inline)) msr_t rdmsr(unsigned val)
+{
+	msr_t ret;
+	__asm__ volatile(
+		"rdmsr"
+		: "=a" (ret.lo), "=d" (ret.hi)
+		: "c" (val)
+		);
+	return ret;
+}
+
+static inline __attribute__((always_inline)) void wrmsr(unsigned val, msr_t msr)
+{
+	__asm__ __volatile__ (
+		"wrmsr"
+		: /* No outputs */
+		: "c" (val), "a" (msr.lo), "d" (msr.hi)
+		);
 }
 
 static inline void intel_waitforsts(void) {

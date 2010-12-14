@@ -11,6 +11,8 @@
 #include "gui.h"
 #include "appleboot.h"
 #include "vers.h"
+#include "edid.h"
+#include "autoresolution.h"
 
 #define IMG_REQUIRED -1
 #define THEME_NAME_DEFAULT	"Default"
@@ -49,6 +51,10 @@ enum {
     iDeviceHFSRAID_o,
     iDeviceEXT3,
     iDeviceEXT3_o,
+    iDeviceFreeBSD,
+    iDeviceFreeBSD_o,
+    iDeviceOpenBSD,
+    iDeviceOpenBSD_o,
     iDeviceFAT,
     iDeviceFAT_o,
     iDeviceFAT16,
@@ -98,6 +104,10 @@ image_t images[] = {
     {.name = "device_hfsraid_o",            .image = NULL},
     {.name = "device_ext3",                 .image = NULL},
     {.name = "device_ext3_o",               .image = NULL},
+    {.name = "device_freebsd",              .image = NULL},
+    {.name = "device_freebsd_o",            .image = NULL},
+    {.name = "device_openbsd",              .image = NULL},
+    {.name = "device_openbsd_o",            .image = NULL},
     {.name = "device_fat",                  .image = NULL},
     {.name = "device_fat_o",                .image = NULL},
     {.name = "device_fat16",                .image = NULL},
@@ -309,6 +319,10 @@ static int loadGraphics(void)
 	LOADPNG(device_hfsraid_o,               iDeviceHFSRAID);
 	LOADPNG(device_ext3,                    iDeviceGeneric);
 	LOADPNG(device_ext3_o,                  iDeviceEXT3);
+	LOADPNG(device_freebsd,                 iDeviceGeneric);
+	LOADPNG(device_freebsd_o,               iDeviceFreeBSD);
+	LOADPNG(device_openbsd,                 iDeviceGeneric);
+	LOADPNG(device_openbsd_o,               iDeviceOpenBSD);
 	LOADPNG(device_fat,                     iDeviceGeneric);
 	LOADPNG(device_fat_o,                   iDeviceFAT);
 	LOADPNG(device_fat16,                   iDeviceFAT);
@@ -679,10 +693,11 @@ void loadThemeValues(config_file_t *theme)
  
 int initGUI(void)
 {
-	int		val;
+	int		val, count;
 	int	len;
 	char	dirspec[256];
 
+	// find theme name in boot.plist
 	getValueForKey( "Theme", &theme_name, &len, &bootInfo->bootConfig );
 	if ((strlen(theme_name) + 27) > sizeof(dirspec)) {
 		return 1;
@@ -700,23 +715,46 @@ int initGUI(void)
 		return 1;
 #endif
 	}
-	// parse display size parameters
-	if (getIntForKey("screen_width", &val, &bootInfo->themeConfig) && val > 0) {
-		screen_params[0] = val;
-	}
-	if (getIntForKey("screen_height", &val, &bootInfo->themeConfig) && val > 0) {
-		screen_params[1] = val;
+	/*
+	* AutoResolution
+	*/
+	if (gAutoResolution == TRUE) //Get Resolution from Graphics Mode key
+	{
+		count = getNumberArrayFromProperty(kGraphicsModeKey, screen_params, 4);
+		if ( count < 3 )
+		{
+			//If no Graphics Mode key, get it from EDID
+			getResolution(screen_params);
+			PRINT("Resolution : %dx%d (EDID)\n",screen_params[0], screen_params[1]);
+		} else 
+			PRINT("Resolution : %dx%d (Graphics Mode key)\n",screen_params[0], screen_params[1]);
+ 	} 
+	else
+	{
+ 		// parse screen size parameters
+ 		if(getIntForKey("screen_width", &val, &bootInfo->themeConfig))
+ 			screen_params[0] = val;
+ 		else
+ 			screen_params[0] = DEFAULT_SCREEN_WIDTH;
+ 		
+ 		if(getIntForKey("screen_height", &val, &bootInfo->themeConfig))
+ 			screen_params[1] = val;
+ 		else
+ 			screen_params[1] = DEFAULT_SCREEN_HEIGHT;
 	}
 
 	// Initalizing GUI strucutre.
 	bzero(&gui, sizeof(gui_t));
 	
 	// find best matching vesa mode for our requested width & height
+	loadConfigFile(dirspec, &bootInfo->themeConfig);
 	getGraphicModeParams(screen_params);
 
 	// set our screen structure with the mode width & height
 	gui.screen.width = screen_params[0];	
 	gui.screen.height = screen_params[1];
+	PRINT("Found mode %dx%d in VESA Table\n", gui.screen.width, gui.screen.height);
+
 
 	// load graphics otherwise fail and return
 	if (loadGraphics() == 0) {
@@ -738,13 +776,18 @@ int initGUI(void)
 								setVideoMode( GRAPHICS_MODE, 0 );
 								gui.initialised = true;
 								return 0;
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+							} else printf("createWindowBuffer(&gui.menu) Failed\n");
+						} else printf("createWindowBuffer(&gui.infobox) Failed\n");
+					} else printf("createWindowBuffer(&gui.bootprompt) Failed\n");
+				} else printf("createWindowBuffer(&gui.devicelist) Failed\n");
+			} else printf("createWindowBuffer(&gui.screen) Failed\n");
+		} else printf("createBackBuffer(&gui.screen) Failed\n");
+	} else printf("loadGraphics() Failed\n");
+	
+#ifdef AUTORES_DEBUG		
+	printf("Press Any Key...\n");
+	getc();
+#endif
 	return 1;
 }
 
@@ -778,6 +821,14 @@ void drawDeviceIcon(BVRef device, pixmap_t *buffer, position_t p, bool isSelecte
 
 			case kPartitionTypeEXT3:
 				devicetype = iDeviceEXT3;		// Use EXT2/3 icon
+				break;
+
+			case kPartitionTypeFreeBSD:
+				devicetype = iDeviceFreeBSD;		// Use FreeBSD icon
+				break;
+
+			case kPartitionTypeOpenBSD:
+				devicetype = iDeviceOpenBSD;		// Use OpenBSD icon
 				break;
 
 			default:
@@ -862,13 +913,13 @@ void drawDeviceList (int start, int end, int selection)
 			 
 			if(gui.menu.draw)
 				drawInfoMenuItems();
-			 
-#if DEBUG
+#ifdef AUTORES_DEBUG
+#define DEBUG
+#endif
+#ifdef DEBUG
             gui.debug.cursor = pos( 10, 100);
             dprintf( &gui.screen, "label     %s\n",   param->label );
             dprintf( &gui.screen, "biosdev   0x%x\n", param->biosdev );
-            dprintf(&gui.screen,  "width     %d\n",  gui.screen.width);
-            dprintf(&gui.screen,  "height    %d\n",  gui.screen.height);
             dprintf( &gui.screen, "type      0x%x\n", param->type );
             dprintf( &gui.screen, "flags     0x%x\n", param->flags );
             dprintf( &gui.screen, "part_no   %d\n",   param->part_no );
@@ -878,6 +929,14 @@ void drawDeviceList (int start, int end, int selection)
             dprintf( &gui.screen, "name      %s\n",   param->name );
             dprintf( &gui.screen, "type_name %s\n",   param->type_name );
             dprintf( &gui.screen, "modtime   %d\n",   param->modTime );
+            dprintf( &gui.screen, "width     %d\n",	  gui.screen.width);
+            dprintf( &gui.screen, "height    %d\n",    gui.screen.height);
+            dprintf( &gui.screen, "attr:     0x%x\n",  gui.screen.attr);
+            dprintf( &gui.screen, "mm:       %d\n",    gui.screen.mm);
+#endif
+			
+#ifdef AUTORES_DEBUG
+#undef DEBUG
 #endif
 		}
 		
@@ -1816,7 +1875,7 @@ static void loadBootGraphics(void)
 void drawBootGraphics(void)
 {
 	int pos;
-	int length;
+	int length, count;
 	const char *dummyVal;
 	int oldScreenWidth, oldScreenHeight;
 	bool legacy_logo;
@@ -1828,16 +1887,29 @@ void drawBootGraphics(void)
 		loadBootGraphics();
 	}
 
-	// parse screen size parameters
-	if (getIntForKey("boot_width", &pos, &bootInfo->themeConfig) && pos > 0) {
-		screen_params[0] = pos;
-	} else {
-		screen_params[0] = DEFAULT_SCREEN_WIDTH;
+	/*
+ 	 * AutoResolution
+ 	 */
+ 	if (gAutoResolution == TRUE)
+	{
+ 		//Get Resolution from Graphics Mode key
+ 		count = getNumberArrayFromProperty(kGraphicsModeKey, screen_params, 4);
+ 		if ( count < 3 )
+ 			//If no Graphics Mode key, get resolution from EDID
+ 			getResolution(screen_params);
 	}
-	if (getIntForKey("boot_height", &pos, &bootInfo->themeConfig) && pos > 0) {
-		screen_params[1] = pos;
-	} else {
-		screen_params[1] = DEFAULT_SCREEN_HEIGHT;
+	else
+	{
+ 		// parse screen size parameters
+ 		if(getIntForKey("boot_width", &pos, &bootInfo->themeConfig))
+ 			screen_params[0] = pos;
+ 		else
+			screen_params[0] = DEFAULT_SCREEN_WIDTH;
+ 		
+ 		if(getIntForKey("boot_height", &pos, &bootInfo->themeConfig))
+ 			screen_params[1] = pos;
+ 		else
+			screen_params[1] = DEFAULT_SCREEN_HEIGHT;
 	}
 
     // Save current screen resolution.

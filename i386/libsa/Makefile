@@ -27,12 +27,12 @@ LIBS=
 VPATH = $(OBJROOT):$(SYMROOT)
 
 SA_OBJS = prf.o printf.o zalloc.o \
-	string.o strtol.o error.o \
+	string.o strtol.o strtod.o error.o \
 	setjmp.o qsort.o efi_tables.o
 
 SFILES = setjmp.s
 CFILES = prf.c printf.c zalloc.c \
-	string.c strtol.c error.c \
+	string.c strtol.c strtod.c error.c \
 	qsort.c efi_tables.c
 HFILES = memory.h
 EXPORTED_HFILES = libsa.h memory.h
@@ -42,7 +42,8 @@ ALLSRC =  $(SFILES) $(CFILES) $(HFILES) $(OTHERFILES)
 LIBS = libsa.a
 DIRS_NEEDED = $(OBJROOT) $(SYMROOT)
 
-all embedtheme: $(DIRS_NEEDED) $(LIBS)
+all embedtheme autores_dbg debug: $(DIRS_NEEDED) $(LIBS)
+debug: CFLAGS += -DDEBUG
 
 libsa.a: $(SA_OBJS)
 	rm -f $(SYMROOT)/$(@F)

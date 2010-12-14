@@ -29,6 +29,7 @@
 #include "gui.h"
 #include "embedded.h"
 #include "pci.h"
+#include "autoresolution.h"
 
 static bool shouldboot = false;
 
@@ -733,26 +734,55 @@ int getBootOptions(bool firstRun)
 		gBootMode |= kBootModeSafe;
 	}
 
-	// Checking user pressed keys
-	bool f8press = false, spress = false, vpress = false;
-	while (readKeyboardStatus()) {
-		key = bgetc ();
-		if (key == 0x4200) f8press = true;
-		if ((key & 0xff) == 's' || (key & 0xff) == 'S') spress = true;
-		if ((key & 0xff) == 'v' || (key & 0xff) == 'V') vpress = true;
-	}
+	//	 18seven's Quick-args macro
+		bool f8 = false, altf = false, shiftf = false, alts = false, 
+		altv = false, x32 = false,  x64 = false, altx = false;
+		while (readKeyboardStatus()) {
+			key = bgetc ();
+			if (key == 0x4200) f8 = true;
+			if (key == 0x2100) altf = true;
+			if (key == 0x2146) shiftf = true;
+			if (key == 0x1F00) alts = true;
+			if (key == 0x2F00) altv = true;
+			if (key == 0x2D00) altx = true;
+			if (key == 0x0403) x32 = true;
+			if (key == 0x0705) x64 = true;
+		}
+
 	// If user typed F8, abort quiet mode, and display the menu.
-	if (f8press) {
+	if (f8) {
 		gBootMode &= ~kBootModeQuiet;
 		timeout = 0;
 	}
-	// If user typed 'v' or 'V', boot in verbose mode.
-	if ((gBootMode & kBootModeQuiet) && firstRun && vpress) {
+
+	// If user typed 'alt-v', boot in verbose mode.
+	if ((gBootMode & kBootModeQuiet) && firstRun && altv) {
 		addBootArg(kVerboseModeFlag);
 	}
-	// If user typed 's' or 'S', boot in single user mode.
-	if ((gBootMode & kBootModeQuiet) && firstRun && spress) {
+
+	// If user typed 'alt-s', boot in single user mode.
+	if ((gBootMode & kBootModeQuiet) && firstRun && alts) {
 		addBootArg(kSingleUserModeFlag);
+	}
+
+	if ((gBootMode & kBootModeQuiet) && firstRun && altf) {
+		addBootArg(kIgnoreCachesFlag);
+	}
+
+	if ((gBootMode & kBootModeQuiet) && firstRun && shiftf) {
+		addBootArg(kIgnoreBootFileFlag);
+	}
+
+	if ((gBootMode & kBootModeQuiet) && firstRun && altx) {
+		addBootArg(kSafeModeFlag);
+	}
+
+	if ((gBootMode & kBootModeQuiet) && firstRun && x32) {
+		addBootArg(k32BitModeFlag);
+	}
+
+	if ((gBootMode & kBootModeQuiet) && firstRun && x64) {
+		addBootArg(k64BitModeFlag);
 	}
 
 	if (bootArgs->Video.v_display == VGA_TEXT_MODE) {
@@ -767,7 +797,7 @@ int getBootOptions(bool firstRun)
 		verbose("Scanning device %x...", gBIOSDev);
 	}
 
-	// When booting from CD, default to hard drive boot when possible. 
+	// When booting from CD, default to hard drive boot when possible.
 	if (isCDROM && firstRun) {
 		const char *val;
 		char *prompt = NULL;
@@ -979,6 +1009,92 @@ int getBootOptions(bool firstRun)
 		case kEscapeKey:
 			clearBootArgs();
 			break;
+				
+		case kF2Key:
+								
+				/*
+				 * AutoResolution - Reapply the patch if Graphics Mode was incorrect
+				 *                  or EDID Info was insane
+				 */	
+				
+				//get the new Graphics Mode key
+				processBootOptions();
+				if ((gAutoResolution == TRUE) && map)
+				{
+					UInt32 params[4];
+					params[3] = 0;
+					//Has the target Resolution Changed ?
+					int count = getNumberArrayFromProperty(kGraphicsModeKey, params, 4);
+					if ( count < 3 )
+						getResolution(params);
+					
+					if (	(params[0] != 0) && (params[1] != 0)
+						&&	(params[0] != map->currentX) && (params[1] != map->currentY))
+					{
+						
+						//Go back to TEXT mode while we change  the mode
+						if (bootArgs->Video.v_display == GRAPHICS_MODE)
+						{
+							CursorState cursorState;
+							
+							setVideoMode(VGA_TEXT_MODE, 0);
+							
+							setCursorPosition(0, 0, 0);
+							clearScreenRows(0, kScreenLastRow);
+							changeCursor( 0, 0, kCursorTypeHidden, &cursorState );
+							
+							//Reapply patch in case resolution have changed
+							
+							patchVbios(map, params[0], params[1], params[2], 0, 0);
+							
+							if (useGUI && (gui.initialised == true))
+								initGUI();
+							// Make sure all values are set
+							if (bootArgs->Video.v_display != GRAPHICS_MODE)
+								bootArgs->Video.v_display = GRAPHICS_MODE;
+							
+							if (!useGUI)
+								useGUI = true;
+							
+							// redraw the background buffer
+							drawBackground();
+							gui.devicelist.draw = true;
+							gui.redraw = true;
+							if (!(gBootMode & kBootModeQuiet))
+							{
+								bool showBootBanner = true;
+								
+								// Check if "Boot Banner"=N switch is present in config file.
+								getBoolForKey(kBootBannerKey, &showBootBanner, &bootInfo->bootConfig); 
+								if (showBootBanner)
+									// Display banner and show hardware info.
+									gprintf(&gui.screen, bootBanner + 1, (bootInfo->convmem + bootInfo->extmem) / 1024);
+								
+								// redraw background
+								memcpy(gui.backbuffer->pixels, gui.screen.pixmap->pixels, gui.backbuffer->width * gui.backbuffer->height * 4);
+							}
+							
+							nextRow = kMenuTopRow;
+							showPrompt = true;
+							
+							if (gDeviceCount)
+							{
+								showMenu( menuItems, gDeviceCount, selectIndex, kMenuTopRow + 2, kMenuMaxItems );
+								nextRow += min( gDeviceCount, kMenuMaxItems ) + 3;
+							}
+							
+							// Show the boot prompt.
+							showPrompt = (gDeviceCount == 0) || (menuBVR->flags & kBVFlagNativeBoot);
+							showBootPrompt( nextRow, showPrompt );
+							
+							//this is used to avoid resetting the incorrect mode while quiting the boot menu
+							map->hasSwitched = true;
+						}
+					}
+					clearBootArgs();
+					key = 0;
+				}
+			break;
 
 		case kF5Key:
 			// New behavior:
@@ -1003,7 +1119,6 @@ int getBootOptions(bool firstRun)
 			// Switch between text & graphic interfaces
 			// Only Permitted if started in graphics interface
 			if (useGUI) {
-				if (bootArgs->Video.v_display == GRAPHICS_MODE) {
 					setVideoMode(VGA_TEXT_MODE, 0);
 
 					setCursorPosition(0, 0, 0);
@@ -1028,12 +1143,25 @@ int getBootOptions(bool firstRun)
 					showPrompt = (gDeviceCount == 0) || (menuBVR->flags & kBVFlagNativeBoot);
 					showBootPrompt(nextRow, showPrompt);
 					//changeCursor( 0, kMenuTopRow, kCursorTypeUnderline, 0 );
+				
+				/*
+				 * AutoResolution - make sure all values are set
+				 */
+				
+				bootArgs->Video.v_display = VGA_TEXT_MODE;
+				useGUI = false;
 				} else {
 					gui.redraw = true;
 					setVideoMode(GRAPHICS_MODE, 0);
+					
+					/*
+					 * AutoResolution - make sure all values are set
+					 */
+					bootArgs->Video.v_display = GRAPHICS_MODE;
+					useGUI = true;
+					
 					updateVRAM();
 				}
-			}
 			key = 0;
 			break;
 
@@ -1180,7 +1308,7 @@ processBootOptions()
 
     // Load com.apple.Boot.plist from the selected volume
     // and use its contents to override default bootConfig.
-    // This is not a mandatory opeartion anymore.
+    // This is not a mandatory operation anymore.
 
     loadOverrideConfig(&bootInfo->overrideConfig);
 

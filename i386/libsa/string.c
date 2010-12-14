@@ -306,6 +306,50 @@ char* strbreak(const char *str, char **next, long *len)
     return start;
 }
 
+// valv: experimenting with float
+double atof (char s[])
+{
+	double val , val1 = 0 , power ;
+	int i ,j , sign , sign1;
+
+	for (i = 0 ; isspace(s[i]) ; i++) /* skip white spaces*/
+		;
+	sign = (s[i] == '-') ? -1 : 1; /*check for the sign of the number*/
+	if (s[i] == '+' || s[i] == '-') /* skip the sign*/
+		i++;
+	for (val = 0.0; isdigit(s[i]) ; i++)
+		val = 10.0 * val + (s[i] - '0');
+	if (s[i] == '.') /*skip the dot*/
+		i++;
+	for (power = 1.0; isdigit(s[i]) ; i++)
+	{
+		val = 10.0 * val + (s[i] - '0');
+		power *= 10.0;
+	}
+	val = val / power;
+	if (s[i] == 'e' || s[i] == 'E') /*skip the character*/
+		i++;
+	sign1 = (s[i] == '-') ? -1 : 1; /*check for the sign of the exponent*/
+
+	if (s[i] == '+' || s[i] == '-') /*skip the sign*/
+		i++;
+	for (power = 1.0 ; isdigit(s[i]) ; i++)
+	{
+		val1 = 10.0 * val1 + (s[i] - '0');
+
+	}
+	for (j = 0; j < val1 ; j++)
+	{
+		power *= 10;
+	}
+	if(sign1 == -1)
+	{
+		return sign * val / power;
+	}
+	else
+		return sign * val * power;
+}
+
 /* COPYRIGHT NOTICE: checksum8 from AppleSMBIOS */
 uint8_t checksum8( void * start, unsigned int length )
 {

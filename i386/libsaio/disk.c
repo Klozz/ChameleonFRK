@@ -66,6 +66,8 @@
 #include "ntfs.h"
 #include "msdos.h"
 #include "ext2fs.h"
+#include "freebsd.h"
+#include "openbsd.h"
 
 #include "xml.h"
 #include "disk.h"
@@ -248,7 +250,7 @@ static int Biosread( int biosdev, unsigned long long secno )
     }
     divisor = bps / BPS;
 
-    DEBUG_DISK(("Biosread dev %x sec %d bps %d\n", biosdev, secno, bps));
+    // DEBUG_DISK(("Biosread dev %x sec %d bps %d\n", biosdev, secno, bps));
 
     // To read the disk sectors, use EBIOS if we can. Otherwise,
     // revert to the standard BIOS calls.
@@ -890,7 +892,29 @@ static BVRef diskScanFDiskBootVolumes( int biosdev, int * countPtr )
                       (BVFree)free,
                       0, kBIOSDevTypeHardDrive, 0);
                     break;
-				
+
+                    case FDISK_FREEBSD:
+                      bvr = newFDiskBVRef(
+                      biosdev, partno,
+                      part->relsect,
+                      part,
+                      0, 0, 0, 0, 0, 0,
+                      FreeBSDGetDescription,
+                      (BVFree)free,
+                      0, kBIOSDevTypeHardDrive, 0);
+                    break;
+
+                    case FDISK_OPENBSD:
+                      bvr = newFDiskBVRef(
+                      biosdev, partno,
+                      part->relsect,
+                      part,
+                      0, 0, 0, 0, 0, 0,
+                      OpenBSDGetDescription,
+                      (BVFree)free,
+                      0, kBIOSDevTypeHardDrive, 0);
+                    break;
+
                     default:
                         bvr = newFDiskBVRef(
                                       biosdev, partno,
@@ -1090,7 +1114,11 @@ static int probeFileSystem(int biosdev, unsigned int blkoff)
   if (HFSProbe(probeBuffer))
     result = FDISK_HFS;
   else if (EX2Probe(probeBuffer))
-	  result = FDISK_LINUX;
+    result = FDISK_LINUX;
+  else if (FreeBSDProbe(probeBuffer))
+    result = FDISK_FREEBSD;
+  else if (OpenBSDProbe(probeBuffer))
+    result = FDISK_OPENBSD;
   else if (NTFSProbe(probeBuffer))
     result = FDISK_NTFS;
   else if (fatbits=MSDOSProbe(probeBuffer))
@@ -1163,7 +1191,7 @@ static BVRef diskScanGPTBootVolumes( int biosdev, int * countPtr )
     }
 
     if ( fdiskID == 0 )  goto scanErr;
-    verbose("Attempting to read GPT\n");
+//    verbose("Attempting to read GPT\n");
 
     if(readBytes(biosdev, 1, 0, BPS, buffer) != 0)
         goto scanErr;
@@ -1232,7 +1260,7 @@ static BVRef diskScanGPTBootVolumes( int biosdev, int * countPtr )
     if(readBytes(biosdev, gptBlock, 0, bufferSize, buffer) != 0)
         goto scanErr;
 
-    verbose("Read GPT\n");
+//    verbose("Read GPT\n");
 
     // Allocate a new map for this BIOS device and insert it into the chain
     map = malloc(sizeof(*map));
@@ -1260,7 +1288,7 @@ static BVRef diskScanGPTBootVolumes( int biosdev, int * countPtr )
         {
             char stringuuid[100];
             efi_guid_unparse_upper((EFI_GUID*)gptMap->ent_type, stringuuid);
-            verbose("Reading GPT partition %d, type %s\n", gptID, stringuuid);
+//            verbose("Reading GPT partition %d, type %s\n", gptID, stringuuid);
 
             // Getting fdisk like partition type.
             fsType = probeFileSystem(biosdev, gptMap->ent_lba_start);
@@ -1675,18 +1703,20 @@ int freeFilteredBVChain(const BVRef chain)
 
 static const struct NamedValue fdiskTypes[] =
 {
-    { FDISK_NTFS,   "Windows NTFS"   },
-	{ FDISK_DOS12,  "Windows FAT12"  },
-	{ FDISK_DOS16B, "Windows FAT16"  },
-	{ FDISK_DOS16S, "Windows FAT16"  },
-	{ FDISK_DOS16SLBA, "Windows FAT16"  },
+    { FDISK_NTFS,        "Windows NTFS"   },
+	{ FDISK_DOS12,       "Windows FAT12"  },
+	{ FDISK_DOS16B,      "Windows FAT16"  },
+	{ FDISK_DOS16S,      "Windows FAT16"  },
+	{ FDISK_DOS16SLBA,   "Windows FAT16"  },
 	{ FDISK_SMALLFAT32,  "Windows FAT32"  },
-	{ FDISK_FAT32,  "Windows FAT32"  },
-    { FDISK_LINUX,  "Linux"          },
-    { FDISK_UFS,    "Apple UFS"      },
-    { FDISK_HFS,    "Apple HFS"      },
-    { FDISK_BOOTER, "Apple Boot/UFS" },
-    { 0xCD,         "CD-ROM"         },
+	{ FDISK_FAT32,       "Windows FAT32"  },
+    { FDISK_FREEBSD,     "FreeBSD"        },
+    { FDISK_OPENBSD,     "OpenBSD"        },
+    { FDISK_LINUX,       "Linux"          },
+    { FDISK_UFS,         "Apple UFS"      },
+    { FDISK_HFS,         "Apple HFS"      },
+    { FDISK_BOOTER,      "Apple Boot/UFS" },
+    { 0xCD,              "CD-ROM"         },
     { 0x00,         0                }  /* must be last */
 };
 

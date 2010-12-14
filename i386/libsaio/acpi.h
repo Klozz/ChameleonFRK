@@ -59,95 +59,102 @@ struct acpi_2_xsdt {
 } __attribute__((packed));
 
 // TODO Migrate
+struct acpi_2_gas {
+	uint8_t				Address_Space_ID;
+	uint8_t				Register_Bit_Width;
+	uint8_t				Register_Bit_Offset;
+	uint8_t				Access_Size;
+	uint64_t			Address;
+} __attribute__((packed));
+
+// TODO Migrate
 struct acpi_2_ssdt {
-	char            Signature[4];
-	uint32_t        Length;
-	uint8_t         Revision;
-	uint8_t         Checksum;
-	char            OEMID[6];
-	char            OEMTableId[8];
-	uint32_t        OEMRevision;
-	uint32_t        CreatorId;
-	uint32_t        CreatorRevision;
+	char				Signature[4];
+	uint32_t			Length;
+	uint8_t				Revision;
+	uint8_t				Checksum;
+	char				OEMID[6];
+	char				OEMTableId[8];
+	uint32_t			OEMRevision;
+	uint32_t			CreatorId;
+	uint32_t			CreatorRevision;
 } __attribute__((packed));
 
 // TODO Migrate
 struct acpi_2_dsdt {
-	char            Signature[4];
-	uint32_t        Length;
-	uint8_t         Revision;
-	uint8_t         Checksum;
-	char            OEMID[6];
-	char            OEMTableId[8];
-	uint32_t        OEMRevision;
-	uint32_t        CreatorId;
-	uint32_t        CreatorRevision;
+	char				Signature[4];
+	uint32_t			Length;
+	uint8_t				Revision;
+	uint8_t				Checksum;
+	char				OEMID[6];
+	char				OEMTableId[8];
+	uint32_t			OEMRevision;
+	uint32_t			CreatorId;
+	uint32_t			CreatorRevision;
 } __attribute__((packed));
 
 // TODO Migrate
 struct acpi_2_fadt {
-	char            Signature[4];
-	uint32_t        Length;
-	uint8_t         Revision;
-	uint8_t         Checksum;
-	char            OEMID[6];
-	char            OEMTableId[8];
-	uint32_t        OEMRevision;
-	uint32_t        CreatorId;
-	uint32_t        CreatorRevision;
-	uint32_t        FIRMWARE_CTRL;
-	uint32_t        DSDT;
-	uint8_t         Model;			// JrCs
-	uint8_t         PM_Profile;		// JrCs
-	uint16_t		SCI_Interrupt;
-	uint32_t		SMI_Command_Port;
-	uint8_t			ACPI_Enable;
-	uint8_t			ACPI_Disable;
-	uint8_t			S4BIOS_Command;
-	uint8_t			PState_Control;
-	uint32_t		PM1A_Event_Block_Address;
-	uint32_t		PM1B_Event_Block_Address;
-	uint32_t		PM1A_Control_Block_Address;
-	uint32_t		PM1B_Control_Block_Address;
-	uint32_t		PM2_Control_Block_Address;
-	uint32_t		PM_Timer_Block_Address;
-	uint32_t		GPE0_Block_Address;
-	uint32_t		GPE1_Block_Address;
-	uint8_t			PM1_Event_Block_Length;
-	uint8_t			PM1_Control_Block_Length;
-	uint8_t			PM2_Control_Block_Length;
-	uint8_t			PM_Timer_Block_Length;
-	uint8_t			GPE0_Block_Length;
-	uint8_t			GPE1_Block_Length;
-	uint8_t			GPE1_Base_Offset;
-	uint8_t			CST_Support;
-	uint16_t		C2_Latency;
-	uint16_t		C3_Latency;
-	uint16_t		CPU_Cache_Size;
-	uint16_t		Cache_Flush_Stride;
-	uint8_t			Duty_Cycle_Offset;
-	uint8_t			Duty_Cycle_Width;
-	uint8_t			RTC_Day_Alarm_Index;
-	uint8_t			RTC_Month_Alarm_Index;
-	uint8_t			RTC_Century_Index;
-	uint16_t		Boot_Flags;
-	uint8_t			Reserved0;
-/* Begin Asere */
-	//Reset Fix
-	uint32_t        Flags;
-	uint8_t         Reset_SpaceID;
-	uint8_t         Reset_BitWidth;
-	uint8_t         Reset_BitOffset;
-	uint8_t         Reset_AccessWidth;
-	uint64_t        Reset_Address;
-	uint8_t         Reset_Value;
-	uint8_t         Reserved[3];
-
-	uint64_t	    X_FIRMWARE_CTRL;
-	uint64_t	    X_DSDT;
-/* End Asere */
-	/*We absolutely don't care about theese fields*/
-	uint8_t		notimp2[96];
+	char				Signature[4];
+	uint32_t			Length;
+	uint8_t				Revision;
+	uint8_t				Checksum;
+	char				OEMID[6];
+	char				OEMTableId[8];
+	uint32_t			OEMRevision;
+	uint32_t			CreatorId;
+	uint32_t			CreatorRevision;
+	uint32_t			FIRMWARE_CTRL;
+	uint32_t			DSDT;
+	uint8_t				INT_MODEL; // JrCs
+	uint8_t				Preferred_PM_Profile; // JrCs
+	uint16_t			SCI_INT;
+	uint32_t			SMI_CMD;
+	uint8_t				ACPI_ENABLE;
+	uint8_t				ACPI_DISABLE;
+	uint8_t				S4BIOS_REQ;
+	uint8_t				PSTATE_CNT;
+	uint32_t			PM1a_EVT_BLK;
+	uint32_t			PM1b_EVT_BLK;
+	uint32_t			PM1a_CNT_BLK;
+	uint32_t			PM1b_CNT_BLK;
+	uint32_t			PM2_CNT_BLK;
+	uint32_t			PM_TMR_BLK;
+	uint32_t			GPE0_BLK;
+	uint32_t			GPE1_BLK;
+	uint8_t				PM1_EVT_LEN;
+	uint8_t				PM1_CNT_LEN;
+	uint8_t				PM2_CNT_LEN;
+	uint8_t				PM_TMR_LEN;
+	uint8_t				GPE0_BLK_LEN;
+	uint8_t				GPE1_BLK_LEN;
+	uint8_t				GPE1_BASE;
+	uint8_t				CST_CNT;
+	uint16_t			P_LVL2_LAT;
+	uint16_t			P_LVL3_LAT;
+	uint16_t			FLUSH_SIZE;
+	uint16_t			FLUSH_STRIDE;
+	uint8_t				DUTY_OFFSET;
+	uint8_t				DUTY_WIDTH;
+	uint8_t				DAY_ALRM;
+	uint8_t				MON_ALRM;
+	uint8_t				CENTURY;
+	uint16_t			IAPC_BOOT_ARCH;
+	uint8_t				Reserved1;
+	uint32_t			Flags;
+	struct acpi_2_gas	RESET_REG;
+	uint8_t				RESET_VALUE;
+	uint8_t				Reserved2[3];
+	uint64_t			X_FIRMWARE_CTRL;
+	uint64_t			X_DSDT;
+	struct acpi_2_gas	X_PM1a_EVT_BLK;
+	struct acpi_2_gas	X_PM1b_EVT_BLK;
+	struct acpi_2_gas	X_PM1a_CNT_BLK;
+	struct acpi_2_gas	X_PM1b_CNT_BLK;
+	struct acpi_2_gas	X_PM2_CNT_BLK;
+	struct acpi_2_gas	X_PM_TMR_BLK;
+	struct acpi_2_gas	X_GPE0_BLK;
+	struct acpi_2_gas	X_GPE1_BLK;
 } __attribute__((packed));
 
 #endif /* !__LIBSAIO_ACPI_H */

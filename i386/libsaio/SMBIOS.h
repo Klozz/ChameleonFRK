@@ -65,6 +65,16 @@ struct SMBEntryPoint {
 	struct DMIEntryPoint	dmi;
 } __attribute__((packed));
 
+struct DMIBIOSInfo {
+	struct DMIHeader	dmiHeader;  	// Type 0
+	SMBString		vendor;				// BIOS vendor name
+	SMBString		version;			// BIOS version
+	SMBWord			startSegment;		// BIOS segment start
+	SMBString		releaseDate;		// BIOS release date
+	SMBByte			romSize;			// (n); 64K * (n+1) bytes
+	SMBQWord		characteristics;	// supported BIOS functions
+} __attribute__((packed));
+
 struct DMIMemoryControllerInfo {/* 3.3.6 Memory Controller Information (Type 5) */
 	struct DMIHeader	dmiHeader;
 	SMBByte			errorDetectingMethod;

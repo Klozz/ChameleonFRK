@@ -4,6 +4,7 @@
 #include "pci.h"
 #include "nvidia.h"
 #include "ati.h"
+#include "gma.h"
 
 extern void set_eth_builtin(pci_dt_t *eth_dev);
 extern void notify_usb_dev(pci_dt_t *pci_dev);
@@ -49,9 +50,9 @@ void setup_pci_devs(pci_dt_t *pci_dt)
 							break;
 					
 						case PCI_VENDOR_ID_INTEL: 
-							/* message to be removed once support for these cards is added */
-							verbose("Intel VGA Controller [%04x:%04x] :: %s (currently NOT SUPPORTED)\n", 
-								current->vendor_id, current->device_id, devicepath);
+							verbose("Intel Graphics Controller [%04x:%04x] :: %s \n",
+							current->vendor_id, current->device_id, devicepath);
+							setup_gma_devprop(current);
 							break;
 					
 						case PCI_VENDOR_ID_NVIDIA: 

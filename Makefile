@@ -46,7 +46,7 @@ GENERIC_SUBDIRS =
 # Currently builds for i386
 #
 
-all embedtheme tags debug install installhdrs: $(SYMROOT) $(OBJROOT)
+all embedtheme autores_dbg tags debug install installhdrs: $(SYMROOT) $(OBJROOT)
 	@if [ -e ".svn" ]; then svnversion -n | tr -d [:alpha:] > revision; fi
 	@if [ -z "$(RC_ARCHS)" ]; then					  \
 		RC_ARCHS="i386";					  \

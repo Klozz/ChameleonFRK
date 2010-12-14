@@ -180,7 +180,7 @@ char *getVBEModeInfoString()
 // Return the VESA mode that matches the properties specified.
 // If a mode is not found, then return the "best" available mode.
 
-static unsigned short
+unsigned short
 getVESAModeWithProperties( unsigned short     width,
                            unsigned short     height,
                            unsigned char      bitsPerPixel,
@@ -387,6 +387,8 @@ setVESAGraphicsMode( unsigned short width,
             break;
         }
 
+		if (refreshRate != 60) refreshRate = 60;
+
 //
 // FIXME : generateCRTCTiming() causes crash.
 //
@@ -425,13 +427,20 @@ setVESAGraphicsMode( unsigned short width,
 //         }
 
         // Set the mode with default refresh rate.
-
+#ifdef AUTORES_DEBUG
+		printf("Is about to set mode #%d with resolution %dx%d\n", mode, minfo.XResolution, minfo.YResolution);
+#endif
         err = setVBEMode( mode | kLinearFrameBufferBit, NULL );
 
         if ( err != errSuccess )
         {
             break;
-        }
+#ifdef AUTORES_DEBUG
+			printf("setVBEMode failed to set mode %d (%dx%d) with error #%d\n",
+				   mode, minfo.XResolution, minfo.YResolution, err);
+			getc();
+#endif
+		}
 
         // Set 8-bit color palette.
 
@@ -461,7 +470,10 @@ setVESAGraphicsMode( unsigned short width,
         bootArgs->Video.v_depth    = minfo.BitsPerPixel;
         bootArgs->Video.v_rowBytes = minfo.BytesPerScanline;
         bootArgs->Video.v_baseAddr = VBEMakeUInt32(minfo.PhysBasePtr);
-
+#if AUTORES_DEBUG
+		gui.screen.mm				= minfo.MemoryModel;
+		gui.screen.attr				= minfo.ModeAttributes;
+#endif
     }
     while ( 0 );
 
@@ -1030,7 +1042,7 @@ setVESATextMode( unsigned short cols,
 //==========================================================================
 // getNumberArrayFromProperty
 
-static int
+int
 getNumberArrayFromProperty( const char *  propKey,
                             unsigned long numbers[],
                             unsigned long maxArrayCount )
@@ -1202,7 +1214,7 @@ spinActivityIndicator(int sectors)
 	{
 		lastTickTime = currentTickTime;
 	}
-	
+
 	if (getVideoMode() == VGA_TEXT_MODE)
 	{
 		if (currentIndicator >= sizeof(indicator))

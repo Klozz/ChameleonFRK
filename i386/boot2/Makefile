@@ -61,6 +61,12 @@ all: $(DIRS_NEEDED) boot
 embedtheme: CFLAGS += -DEMBED_THEME
 embedtheme: art.h all
 
+autores_dbg: CFLAGS += -DAUTORES_DEBUG
+autores_dbg: all
+
+debug: CFLAGS += -DDEBUG
+debug: autores_dbg
+
 boot: machOconv embedded.h $(OBJS) $(LIBDEP)
 	$(LD) -static -Wl,-preload -Wl,-segaddr,__INIT,$(BOOT2ADDR) \
 	        -nostdlib -arch i386 -Wl,-segalign,20 \

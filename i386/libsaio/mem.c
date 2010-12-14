@@ -111,7 +111,7 @@ void scan_memory(PlatformInfo_t *p)
 
     /* We mainly don't use obsolete tables 5,6 because most of computers don't handle it anymore */
      Platform.DMI.MemoryModules = 0;
-    /* Now lets peek info rom table 16,17 as for some bios, table 5 & 6 are not used */
+    /* Now lets peek info from table 16,17 as for some bios, table 5 & 6 are not used */
     physMemArray = (struct DMIPhysicalMemoryArray*) FindFirstDmiTableOfType(16, 4);
     Platform.DMI.MaxMemorySlots = physMemArray ? physMemArray->numberOfMemoryDevices :  0;
  

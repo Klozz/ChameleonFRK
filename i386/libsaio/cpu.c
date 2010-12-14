@@ -1,11 +1,14 @@
 /*
  * Copyright 2008 Islam Ahmed Zaid. All rights reserved.  <azismed@gmail.com>
  * AsereBLN: 2009: cleanup and bugfix
+ * valv:     2010: fine-tuning and additions
  */
 
 #include "libsaio.h"
 #include "platform.h"
 #include "cpu.h"
+#include "boot.h"
+#include "bootstruct.h"
 
 #ifndef DEBUG_CPU
 #define DEBUG_CPU 0
@@ -81,6 +84,7 @@ static uint64_t measure_tsc_frequency(void)
     return retval;
 }
 
+
 /*
  * Calculates the FSB and CPU frequencies using specific MSRs for each CPU
  * - multi. is read from a specific MSR. In the case of Intel, there is:
@@ -92,17 +96,22 @@ static uint64_t measure_tsc_frequency(void)
 
 void scan_cpu(PlatformInfo_t *p)
 {
+	const char	*newratio, *newfsb;
+	int			len, myfsb, i;
 	uint64_t	tscFrequency, fsbFrequency, cpuFrequency;
-	uint64_t	msr, flex_ratio;
-	uint8_t		maxcoef, maxdiv, currcoef, currdiv;
+	uint64_t	msr, flex_ratio = 0;
+	uint32_t	tms, ida, max_ratio, min_ratio;
+	uint8_t		bus_ratio_max, maxdiv, bus_ratio_min, currdiv;
+	bool		fix_fsb, did, core_i, turbo;
 
-	maxcoef = maxdiv = currcoef = currdiv = 0;
+	max_ratio = min_ratio = myfsb = bus_ratio_max = maxdiv = bus_ratio_min = currdiv = i = 0;
 
 	/* get cpuid values */
-	do_cpuid(0x00000000, p->CPU.CPUID[CPUID_0]);
-	do_cpuid(0x00000001, p->CPU.CPUID[CPUID_1]);
-	do_cpuid(0x00000002, p->CPU.CPUID[CPUID_2]);
-	do_cpuid(0x00000003, p->CPU.CPUID[CPUID_3]);
+	for( ; i <= 3; i++)
+	{
+		do_cpuid(i, p->CPU.CPUID[i]);
+	}
+	
 	do_cpuid2(0x00000004, 0, p->CPU.CPUID[CPUID_4]);
 	do_cpuid(0x80000000, p->CPU.CPUID[CPUID_80]);
 	if ((p->CPU.CPUID[CPUID_80][0] & 0x0000000f) >= 1) {
@@ -123,6 +132,7 @@ void scan_cpu(PlatformInfo_t *p)
 	p->CPU.Signature	= p->CPU.CPUID[CPUID_1][0];
 	p->CPU.Stepping		= bitfield(p->CPU.CPUID[CPUID_1][0], 3, 0);
 	p->CPU.Model		= bitfield(p->CPU.CPUID[CPUID_1][0], 7, 4);
+	p->CPU.Type			= bitfield(p->CPU.CPUID[CPUID_1][0], 13, 12);
 	p->CPU.Family		= bitfield(p->CPU.CPUID[CPUID_1][0], 11, 8);
 	p->CPU.ExtModel		= bitfield(p->CPU.CPUID[CPUID_1][0], 19, 16);
 	p->CPU.ExtFamily	= bitfield(p->CPU.CPUID[CPUID_1][0], 27, 20);
@@ -130,7 +140,7 @@ void scan_cpu(PlatformInfo_t *p)
 	p->CPU.NoCores		= bitfield(p->CPU.CPUID[CPUID_4][0], 31, 26) + 1;
 
 	p->CPU.Model += (p->CPU.ExtModel << 4);
-	
+
 	/* get brand string (if supported) */
 	/* Copyright: from Apple's XNU cpuid.c */
 	if (p->CPU.CPUID[CPUID_80][0] > 0x80000004) {
@@ -162,152 +172,526 @@ void scan_cpu(PlatformInfo_t *p)
 	}
 	
 	/* setup features */
-	if ((bit(23) & p->CPU.CPUID[CPUID_1][3]) != 0) {
-		p->CPU.Features |= CPU_FEATURE_MMX;
-	}
-	if ((bit(25) & p->CPU.CPUID[CPUID_1][3]) != 0) {
-		p->CPU.Features |= CPU_FEATURE_SSE;
-	}
-	if ((bit(26) & p->CPU.CPUID[CPUID_1][3]) != 0) {
-		p->CPU.Features |= CPU_FEATURE_SSE2;
-	}
-	if ((bit(0) & p->CPU.CPUID[CPUID_1][2]) != 0) {
-		p->CPU.Features |= CPU_FEATURE_SSE3;
-	}
-	if ((bit(19) & p->CPU.CPUID[CPUID_1][2]) != 0) {
-		p->CPU.Features |= CPU_FEATURE_SSE41;
-	}
-	if ((bit(20) & p->CPU.CPUID[CPUID_1][2]) != 0) {
-		p->CPU.Features |= CPU_FEATURE_SSE42;
-	}
-	if ((bit(29) & p->CPU.CPUID[CPUID_81][3]) != 0) {
-		p->CPU.Features |= CPU_FEATURE_EM64T;
-	}
-	if ((bit(5) & p->CPU.CPUID[CPUID_1][3]) != 0) {
-		p->CPU.Features |= CPU_FEATURE_MSR;
-	}
-	//if ((bit(28) & p->CPU.CPUID[CPUID_1][3]) != 0) {
+	p->CPU.Features |= (CPU_FEATURE_MMX | CPU_FEATURE_SSE | CPU_FEATURE_SSE2 | CPU_FEATURE_MSR | CPU_FEATURE_APIC | CPU_FEATURE_TM1 | CPU_FEATURE_ACPI) & p->CPU.CPUID[CPUID_1][3];
+	p->CPU.Features |= (CPU_FEATURE_SSE3 | CPU_FEATURE_SSE41 | CPU_FEATURE_SSE42 | CPU_FEATURE_EST | CPU_FEATURE_TM2 | CPU_FEATURE_SSSE3 | CPU_FEATURE_xAPIC) & p->CPU.CPUID[CPUID_1][2];
+	p->CPU.Features |= (CPU_FEATURE_EM64T | CPU_FEATURE_XD) & p->CPU.CPUID[CPUID_81][3];
+	p->CPU.Features |= (CPU_FEATURE_LAHF) & p->CPU.CPUID[CPUID_81][2];
+
+
+	//if ((CPU_FEATURE_HTT & p->CPU.CPUID[CPUID_1][3]) != 0) {
 	if (p->CPU.NoThreads > p->CPU.NoCores) {
 		p->CPU.Features |= CPU_FEATURE_HTT;
 	}
+	 
 
 	tscFrequency = measure_tsc_frequency();
 	fsbFrequency = 0;
 	cpuFrequency = 0;
+	fix_fsb = false;
+	did = false;
+	core_i = false;
+	turbo = false;
 
-	if ((p->CPU.Vendor == 0x756E6547 /* Intel */) && ((p->CPU.Family == 0x06) || (p->CPU.Family == 0x0f))) {
-		if ((p->CPU.Family == 0x06 && p->CPU.Model >= 0x0c) || (p->CPU.Family == 0x0f && p->CPU.Model >= 0x03)) {
-			/* Nehalem CPU model */
-			if (p->CPU.Family == 0x06 && (p->CPU.Model == 0x1a || p->CPU.Model == 0x1e
-			 || p->CPU.Model == 0x1f || p->CPU.Model == 0x25 || p->CPU.Model == 0x2c)) {
-				msr = rdmsr64(MSR_PLATFORM_INFO);
-				DBG("msr(%d): platform_info %08x\n", __LINE__, msr & 0xffffffff);
-				currcoef = (msr >> 8) & 0xff;
-				msr = rdmsr64(MSR_FLEX_RATIO);
-				DBG("msr(%d): flex_ratio %08x\n", __LINE__, msr & 0xffffffff);
-				if ((msr >> 16) & 0x01) {
-					flex_ratio = (msr >> 8) & 0xff;
-					if (currcoef > flex_ratio) {
-						currcoef = flex_ratio;
-					}
-				}
+	if ((p->CPU.Vendor == 0x756E6547 /* Intel */) && ((p->CPU.Family == 0x06) || (p->CPU.Family == 0x0f)))
+	{
+		verbose("CPU: ");
+		int tjmax = 0;
+		msr = rdmsr64(MSR_IA32_PLATFORM_ID);
+		if (((msr >> 50) & 0x01) == 1)
+		{
+			p->CPU.Features |= CPU_FEATURE_MOBILE;
+			verbose("Mobile ");
+		}
+		verbose("%s\n", p->CPU.BrandString);
+		
+		if ((p->CPU.Family == 0x06 && p->CPU.Model >= 0x0c) || (p->CPU.Family == 0x0f && p->CPU.Model >= 0x03))
+		{
+			if (p->CPU.Family == 0x06)
+			{
+				int intelCPU = p->CPU.Model;
+				int Stepp = p->CPU.Stepping;
+				int bus;
 
-				if (currcoef) {
-					fsbFrequency = (tscFrequency / currcoef);
-				}
-				cpuFrequency = tscFrequency;
-			} else {
-				msr = rdmsr64(MSR_IA32_PERF_STATUS);
-				DBG("msr(%d): ia32_perf_stat 0x%08x\n", __LINE__, msr & 0xffffffff);
-				currcoef = (msr >> 8) & 0x1f;
-				/* Non-integer bus ratio for the max-multi*/
-				maxdiv = (msr >> 46) & 0x01;
-				/* Non-integer bus ratio for the current-multi (undocumented)*/
-				currdiv = (msr >> 14) & 0x01;
-
-				if ((p->CPU.Family == 0x06 && p->CPU.Model >= 0x0e) || (p->CPU.Family == 0x0f)) // This will always be model >= 3
+				switch (intelCPU)
 				{
-					/* On these models, maxcoef defines TSC freq */
-					maxcoef = (msr >> 40) & 0x1f;
-				} else {
-					/* On lower models, currcoef defines TSC freq */
-					/* XXX */
-					maxcoef = currcoef;
-				}
+					case 0x1a:		// Core i7 LGA1366, Xeon 5500, "Bloomfield", "Gainstown", 45nm
+					case 0x1e:		// Core i7, i5 LGA1156, "Clarksfield", "Lynnfield", "Jasper", 45nm
+					case 0x1f:		// Core i7, i5, Nehalem
+					case 0x25:		// Core i7, i5, i3 LGA1156, "Westmere", "Clarkdale", "Arrandale", 32nm
+					case 0x2c:		// Core i7 LGA1366, Six-core, "Westmere", "Gulftown", 32nm
+					case 0x2e:		// Core i7, Nehalem-Ex Xeon, "Beckton"
+					case 0x2f:		// Core i7, Nehalem-Ex Xeon, "Eagleton"
+						core_i = true;
+						tjmax = (rdmsr64(MSR_THERMAL_TARGET) >> 16) & 0xff;
+						msr = rdmsr64(MSR_PLATFORM_INFO);
+						bus_ratio_max = (msr >> 8) & 0xff;
+						bus_ratio_min = (msr >> 40) & 0xff; //valv: not sure about this one (Remarq.1)
+						verbose("Flex: %d ", bus_ratio_max);
+						min_ratio = bus_ratio_min * 10;
+						msr = rdmsr64(MSR_FLEX_RATIO);
+						if ((msr >> 16) & 0x01)
+						{
+							flex_ratio = (msr >> 8) & 0xff;
+							verbose(">> %d", flex_ratio);
+							if(bus_ratio_max > flex_ratio) bus_ratio_max = flex_ratio;
+						}
+						verbose("\n");
+						if(bus_ratio_max) fsbFrequency = (tscFrequency / bus_ratio_max);
 
-				if (maxcoef) {
-					if (maxdiv) {
-						fsbFrequency = ((tscFrequency * 2) / ((maxcoef * 2) + 1));
-					} else {
-						fsbFrequency = (tscFrequency / maxcoef);
-					}
-					if (currdiv) {
-						cpuFrequency = (fsbFrequency * ((currcoef * 2) + 1) / 2);
-					} else {
-						cpuFrequency = (fsbFrequency * currcoef);
-					}
-					DBG("max: %d%s current: %d%s\n", maxcoef, maxdiv ? ".5" : "",currcoef, currdiv ? ".5" : "");
+						//valv: Turbo Ratio Limit
+						if ((intelCPU != 0x2e) && (intelCPU != 0x2f))
+						{
+							turbo = true;
+							msr = rdmsr64(MSR_TURBO_RATIO_LIMIT);
+							
+							p->CPU.Tone = (msr >> 0) & 0xff;
+							p->CPU.Ttwo = (msr >> 8) & 0xff;
+							p->CPU.Tthr = (msr >> 16) & 0xff;
+							p->CPU.Tfor = (msr >> 24) & 0xff;
+
+							cpuFrequency = bus_ratio_max * fsbFrequency;
+							max_ratio = bus_ratio_max * 10;
+						}
+						else cpuFrequency = tscFrequency;
+
+						if ((getValueForKey(kbusratio, &newratio, &len, &bootInfo->bootConfig)) && (len <= 4))
+						{
+							max_ratio = atoi(newratio);
+							max_ratio = (max_ratio * 10);
+							if (len >= 3) max_ratio = (max_ratio + 5);
+
+							verbose("Bus-Ratio: min=%d%s, max=%d%s\n", bus_ratio_min, bus_ratio_max);
+
+							// extreme overclockers may love 320 ;)
+							if ((max_ratio >= min_ratio) && (max_ratio <= 320))
+							{
+								cpuFrequency = (fsbFrequency * max_ratio) / 10;
+								if (len >= 3) maxdiv = 1;
+								else maxdiv = 0;
+								verbose("Sticking with [BCLK: %dMhz, Bus-Ratio: %s]\n", myfsb, newratio);
+							}
+							else max_ratio = (bus_ratio_max * 10);
+						}
+						//valv: to be uncommented if Remarq.1 didn't stick
+						/*if(bus_ratio_max > 0) bus_ratio = flex_ratio;*/
+						p->CPU.MaxRatio = max_ratio;
+						p->CPU.MinRatio = min_ratio;
+						
+						if(getIntForKey(kForceFSB, &myfsb, &bootInfo->bootConfig)) goto forcefsb;
+						break;
+					case 0xe:		// Core Duo/Solo, Pentium M DC
+						goto teleport;
+					case 0xf:		// Core Xeon, Core 2 DC, 65nm
+						switch (Stepp)
+						{
+							case 0x2:
+								tjmax = 95;
+								break;
+							case 0x6:
+								if (p->CPU.NoCores = 2) tjmax = 80;
+								if (p->CPU.NoCores = 4) tjmax = 90;
+								else tjmax = 85;
+								break;
+							case 0xb:
+								tjmax = 90;
+								break;
+							case 0xd:
+							default:
+							teleport:
+								msr = rdmsr64(MSR_IA32_EXT_CONFIG);
+								if(msr & (1 << 30)) tjmax = 85;
+								break;
+						}
+					case 0x1c:		// Atom :)
+						switch (Stepp)
+						{
+							case 0xa:
+								tjmax = 100;
+								break;
+							case 0x2:
+							default:
+								tjmax = 90;
+								break;
+						}
+					case 0x17:		// Core 2 Duo/Extreme, Xeon, 45nm
+						switch (Stepp)
+						{
+							case 0x6:		// Mobile Core2 Duo
+								tjmax = 104;
+								break;
+							case 0xa:		// Mobile Centrino 2
+								tjmax = 105;
+								break;
+							default:
+								if (platformCPUFeature(CPU_FEATURE_MOBILE)) tjmax = 105;
+								break;
+						}
+					case 0x16:		// Celeron, Core 2 SC, 65nm
+					case 0x27:		// Atom Lincroft, 45nm
+						core_i = false;
+						
+						if(platformCPUFeature(CPU_FEATURE_TM1))
+						{
+							msr_t msr32;
+							msr32 = rdmsr(MSR_IA32_MISC_ENABLE);
+
+							if(!(rdmsr64(MSR_IA32_MISC_ENABLE) & (1 << 3))) msr32.lo |= (1 << 3);
+							verbose("Thermal Monitor: TM, ");
+							if(platformCPUFeature(CPU_FEATURE_TM2))
+							{
+								msr32.lo |= (1 << 13);
+								verbose("TM2, ");
+							}
+							msr32.lo |= (1 << 17);
+							verbose("PROCHOT, ");
+							msr32.lo |= (1 << 10);
+							verbose("FERR\n");
+							
+							bool oem_ssdt, tmpval;
+							oem_ssdt = false;
+							
+							oem_ssdt = getBoolForKey(kOEMSSDT, &tmpval, &bootInfo->bootConfig)&&tmpval;
+							if(oem_ssdt)
+							{
+								bool c2e, c4e, hc4e;
+								c2e = c4e = hc4e = false;
+
+								getBoolForKey(kC2EEnable, &c2e, &bootInfo->bootConfig);
+								if(c2e) msr32.lo |= (1 << 26);
+							
+								getBoolForKey(kC4EEnable, &c4e, &bootInfo->bootConfig);
+								if((c4e) && platformCPUFeature(CPU_FEATURE_MOBILE)) msr32.hi |= (1 << (32 - 32));
+								getBoolForKey(kHardC4EEnable, &hc4e, &bootInfo->bootConfig);
+								if((hc4e) && platformCPUFeature(CPU_FEATURE_MOBILE)) msr32.hi |= (1 << (33 - 32));
+							}
+							
+							msr32.hi |= (1 << (36 - 32)); // EMTTM
+
+							wrmsr(MSR_IA32_MISC_ENABLE, msr32);
+						}
+						
+						if (rdmsr64(MSR_IA32_EXT_CONFIG) & (1 << 27))
+						{
+							wrmsr64(MSR_IA32_EXT_CONFIG, (rdmsr64(MSR_IA32_EXT_CONFIG) | (1 << 28)));
+							delay(1);
+							did = rdmsr64(MSR_IA32_EXT_CONFIG) & (1 << 28);
+						}
+						getBoolForKey(kFixFSB, &fix_fsb, &bootInfo->bootConfig);
+						if(fix_fsb)
+						{
+							msr = rdmsr64(MSR_FSB_FREQ);
+							bus = (msr >> 0) & 0x7;
+							switch (bus)
+							{
+								case 0:
+									fsbFrequency = 266666667;
+									myfsb = 266;
+									break;
+								case 1:
+									fsbFrequency = 133333333;
+									myfsb = 133;
+									break;
+								case 3:
+									fsbFrequency = 166666667;
+									myfsb = 166;
+									break;
+								case 4:
+									fsbFrequency = 333333333;
+									myfsb = 333;
+									break;
+								case 5:
+									fsbFrequency = 100000000;
+									myfsb = 100;
+									break;
+								case 6:
+									fsbFrequency = 400000000;
+									myfsb = 400;
+									break;
+								case 2:
+								default:
+									fsbFrequency = 200000000;
+									myfsb = 200;
+									break;
+							}
+							uint64_t minfsb = 183000000, maxfsb = 185000000;
+							if (((fsbFrequency > minfsb) && (fsbFrequency < maxfsb)) || (!fsbFrequency)) fsbFrequency = 200000000;
+							goto ratio;
+						}
+					case 0x1d:		// Xeon MP MP 7400
+					// for 0x2a & 0x2b turbo is true;
+					//case 0x2a:		// SNB
+					//case 0x2b:		// SNB Xeon
+					default:
+						if(getIntForKey(kForceFSB, &myfsb, &bootInfo->bootConfig))
+						{
+							forcefsb:
+							switch(myfsb)
+							{
+								case 133:
+									fsbFrequency = 133333333;
+									break;
+								case 166:
+									fsbFrequency = 166666667;
+									break;
+								case 233:
+									fsbFrequency = 233333333;
+									break;
+								case 266:
+									fsbFrequency = 266666667;
+									break;
+								case 333:
+									fsbFrequency = 333333333;
+									break;
+								case 100:
+								case 200:
+								case 400:
+									fsbFrequency = (myfsb * 1000000);
+									break;
+								default:
+									getValueForKey(kForceFSB, &newfsb, &len, &bootInfo->bootConfig);
+									if((len <= 3) && (myfsb < 400))
+									{
+										fsbFrequency = (myfsb * 1000000);
+										verbose("Specified FSB: %dMhz. Assuming you know what you 're doing !\n", myfsb);
+									}
+									else if(core_i) fsbFrequency = 133333333;
+									else fsbFrequency = 200000000;
+									break;
+							}
+							if(core_i)
+							{
+								cpuFrequency = (fsbFrequency * max_ratio) / 10;
+								verbose("Sticking with [BCLK: %dMhz, Bus-Ratio: %s]\n", myfsb, newratio);
+								break;
+							}
+							fix_fsb = true;
+						}
+						goto ratio;
+						break;
 				}
 			}
+			else
+			{
+				ratio:
+				msr = rdmsr64(MSR_IA32_PERF_STATUS);
+				maxdiv = (msr >> 46) & 0x01;
+				//valv: this seems to be bit 15 instead of 14.
+				currdiv = (msr >> 15) & 0x01;
+				uint8_t XE = (msr >> 31) & 0x01;
+
+				msr_t msr;
+				msr = rdmsr(MSR_IA32_PERF_STATUS);
+				bus_ratio_min = (msr.lo >> 24) & 0x1f;
+				min_ratio = bus_ratio_min * 10;
+				if(currdiv) min_ratio = min_ratio + 5;
+				
+				if(XE) bus_ratio_max = (msr.hi >> (40-32)) & 0x1f;
+				else bus_ratio_max = ((rdmsr64(MSR_IA32_PLATFORM_ID) >> 8) & 0x1f);
+
+				if(fix_fsb)
+				{
+					ratio_gn:
+					if ((getValueForKey(kbusratio, &newratio, &len, &bootInfo->bootConfig)) && (len <= 4))
+					{
+						max_ratio = atoi(newratio);
+						max_ratio = (max_ratio * 10);
+						if (len >= 3) max_ratio = (max_ratio + 5);
+
+						verbose("Bus-Ratio defaults: min=%d%s, max=%d%s\n", bus_ratio_min, currdiv ? ".5" : "", bus_ratio_max, maxdiv ? ".5" : "");
+						if ((max_ratio >= min_ratio) && (max_ratio < 200))
+						{
+							cpuFrequency = (fsbFrequency * max_ratio) / 10;
+							if (len >= 3) maxdiv = 1;
+							else maxdiv = 0;
+							verbose("Sticking with [FSB: %dMhz, Bus-Ratio: %s]\n", myfsb, newratio);
+						}
+						else
+						{
+							printf("Bus-Ratio: Lowest allowed = %d%s. ", bus_ratio_min, currdiv ? ".5" : "");
+							goto ratio_vldt;
+						}
+					}
+					else 
+					{
+						ratio_vldt:
+						if (maxdiv)
+						{
+							cpuFrequency = ((fsbFrequency * ((bus_ratio_max * 2) + 1)) / 2);
+							max_ratio = (bus_ratio_max * 10) + 5;
+						}
+						else
+						{
+							cpuFrequency = (fsbFrequency * bus_ratio_max);
+							max_ratio = bus_ratio_max * 10;
+						}
+						verbose("CPU: Sticking with [FSB: %dMhz, Bus-Ratio: %d%s] %s\n", myfsb, bus_ratio_max, maxdiv ? ".5" : "", newratio ? "instead" : "");
+					}
+				}
+				else
+				{
+					/* On lower models, currcoef defines TSC freq */
+					if (((p->CPU.Family == 0x06) && (p->CPU.Model < 0x0e)) && (p->CPU.Family != 0x0f)) bus_ratio_max = bus_ratio_min;
+
+					if (bus_ratio_max)
+					{
+						if (maxdiv)
+						{
+							fsbFrequency = ((tscFrequency * 2) / ((bus_ratio_max * 2) + 1));
+							max_ratio = ((bus_ratio_max * 10) + 5);
+						}
+						else
+						{
+							fsbFrequency = (tscFrequency / bus_ratio_max);
+							max_ratio = (bus_ratio_max * 10);
+						}
+
+						myfsb = (fsbFrequency / 1000000);
+						if (getValueForKey(kbusratio, &newratio, &len, &bootInfo->bootConfig)) goto ratio_gn;
+						else cpuFrequency = ((fsbFrequency * max_ratio) / 10);
+
+						DBG("max: %d%s current: %d%s\n", bus_ratio_max, maxdiv ? ".5" : "", bus_ratio_min, currdiv ? ".5" : "");
+					}
+				}
+				p->CPU.MaxRatio = max_ratio;
+				p->CPU.MinRatio = min_ratio;
+			}
 		}
-		/* Mobile CPU ? */
-		if (rdmsr64(0x17) & (1<<28)) {
-			p->CPU.Features |= CPU_FEATURE_MOBILE;
+
+		// on-die sensor
+		if (p->CPU.CPUID[CPUID_0][0] >= 0x6)
+		{
+			// Highest Basic Functions Number
+			do_cpuid(6, p->CPU.CPUID[CPUID_81]);
+			tms = bitfield(p->CPU.CPUID[CPUID_81][0], 0, 0);
+			ida = bitfield(p->CPU.CPUID[CPUID_81][0], 1, 1);
+			if(tms != 0)
+			{
+				int temp, utjmax;
+				if (tjmax == 0) tjmax = 100;
+				if((getIntForKey(kTjmax, &utjmax, &bootInfo->bootConfig)) && ((70 <= utjmax) && (utjmax <= 110))) tjmax = utjmax;
+				msr = rdmsr64(MSR_THERMAL_STATUS);
+				//if ((msr & 0x3) == 0x3)
+				if (((msr >> 31) & 0x1) == 1)
+				{
+					temp = tjmax - ((msr >> 16) & 0x7F);
+					verbose("CPU: Tjmax ~ %d°C 	          Temperature= ~ %d°C\n", tjmax, temp);
+				}
+				else temp = -1;
+			}
+			if(ida == 0)
+			{
+				verbose("CPU: Attempting to enable IDA      ");
+				msr_t msr;
+				msr = rdmsr(MSR_IA32_MISC_ENABLE);
+				msr.hi |= (0 << (38-32));
+				wrmsr(MSR_IA32_MISC_ENABLE, msr);
+				delay(1);
+				if(bitfield(p->CPU.CPUID[CPUID_81][0], 0, 1) == 0) verbose("Failed!\n");
+				else verbose("Succeded!\n");
+			}
+			else verbose("CPU: Intel Dynamic Acceleration   Enabled!\n");
 		}
 	}
 #if 0
-	else if((p->CPU.Vendor == 0x68747541 /* AMD */) && (p->CPU.Family == 0x0f)) {
-		if(p->CPU.ExtFamily == 0x00 /* K8 */) {
+	else if((p->CPU.Vendor == 0x68747541 /* AMD */) && (p->CPU.Family == 0x0f))
+	{
+		if(p->CPU.ExtFamily == 0x00 /* K8 */)
+		{
 			msr = rdmsr64(K8_FIDVID_STATUS);
-			currcoef = (msr & 0x3f) / 2 + 4;
+			bus_ratio_max = (msr & 0x3f) / 2 + 4;
 			currdiv = (msr & 0x01) * 2;
-		} else if(p->CPU.ExtFamily >= 0x01 /* K10+ */) {
+		}
+		else if(p->CPU.ExtFamily >= 0x01 /* K10+ */)
+		{
 			msr = rdmsr64(K10_COFVID_STATUS);
 			if(p->CPU.ExtFamily == 0x01 /* K10 */)
-				currcoef = (msr & 0x3f) + 0x10;
+				bus_ratio_max = (msr & 0x3f) + 0x10;
 			else /* K11+ */
-				currcoef = (msr & 0x3f) + 0x08;
+				bus_ratio_max = (msr & 0x3f) + 0x08;
 			currdiv = (2 << ((msr >> 6) & 0x07));
 		}
 
-		if (currcoef) {
-			if (currdiv) {
-				fsbFrequency = ((tscFrequency * currdiv) / currcoef);
-				DBG("%d.%d\n", currcoef / currdiv, ((currcoef % currdiv) * 100) / currdiv);
-			} else {
-				fsbFrequency = (tscFrequency / currcoef);
-				DBG("%d\n", currcoef);
+		p->CPU.MaxRatio = bus_ratio_max * 10;
+
+		if (bus_ratio_max)
+		{
+			if (currdiv)
+			{
+				fsbFrequency = ((tscFrequency * currdiv) / bus_ratio_max);
+				DBG("%d.%d\n", bus_ratio_max / currdiv, ((bus_ratio_max % currdiv) * 100) / currdiv);
 			}
-			fsbFrequency = (tscFrequency / currcoef);
+			else
+			{
+				fsbFrequency = (tscFrequency / bus_ratio_max);
+				DBG("%d\n", bus_ratio_max);
+			}
+			fsbFrequency = (tscFrequency / bus_ratio_max);
 			cpuFrequency = tscFrequency;
 		}
 	}
 
-	if (!fsbFrequency) {
+	if (!fsbFrequency)
+	{
 		fsbFrequency = (DEFAULT_FSB * 1000);
 		cpuFrequency = tscFrequency;
 		DBG("0 ! using the default value for FSB !\n");
 	}
 #endif
 
-	p->CPU.MaxCoef = maxcoef;
 	p->CPU.MaxDiv = maxdiv;
-	p->CPU.CurrCoef = currcoef;
 	p->CPU.CurrDiv = currdiv;
 	p->CPU.TSCFrequency = tscFrequency;
 	p->CPU.FSBFrequency = fsbFrequency;
 	p->CPU.CPUFrequency = cpuFrequency;
+	p->CPU.ISerie = false;
+	p->CPU.Turbo = false;
 
-	DBG("CPU: Vendor/Model/ExtModel: 0x%x/0x%x/0x%x\n", p->CPU.Vendor, p->CPU.Model, p->CPU.ExtModel);
-	DBG("CPU: Family/ExtFamily:      0x%x/0x%x\n", p->CPU.Family, p->CPU.ExtFamily);
-	DBG("CPU: MaxCoef/CurrCoef:      0x%x/0x%x\n", p->CPU.MaxCoef, p->CPU.CurrCoef);
-	DBG("CPU: MaxDiv/CurrDiv:        0x%x/0x%x\n", p->CPU.MaxDiv, p->CPU.CurrDiv);
-	DBG("CPU: TSCFreq:               %dMHz\n", p->CPU.TSCFrequency / 1000000);
-	DBG("CPU: FSBFreq:               %dMHz\n", p->CPU.FSBFrequency / 1000000);
-	DBG("CPU: CPUFreq:               %dMHz\n", p->CPU.CPUFrequency / 1000000);
-	DBG("CPU: NoCores/NoThreads:     %d/%d\n", p->CPU.NoCores, p->CPU.NoThreads);
-	DBG("CPU: Features:              0x%08x\n", p->CPU.Features);
-#if DEBUG_CPU
-	pause();
-#endif
+	if (platformCPUFeature(CPU_FEATURE_EST))
+	{
+		msr_t msr32;
+		msr32 = rdmsr(MSR_IA32_MISC_ENABLE);
+		if (!(rdmsr64(MSR_IA32_MISC_ENABLE) & (1 << 16)))
+		{	//valv: we can also attempt to enable
+			msr32.lo |= (1 << 16);
+			// Lock till next reset!
+			msr32.lo |= (1 << 20);
+			wrmsr(MSR_IA32_MISC_ENABLE, msr32);
+			delay(1);
+			if(rdmsr64(MSR_IA32_MISC_ENABLE) & (1 << 16))
+			{
+				p->CPU.EST = 1;
+				verbose("EIST Successfully Enabled!");
+			}
+			else
+			{
+				p->CPU.EST = 0;
+				verbose("EIST couldn't be enabled!");
+			}
+		}
+
+		else p->CPU.EST = 1;
+	}
+	
+	if(core_i) p->CPU.ISerie = true;
+		DBG("CPU: Vendor/Family/ExtFamily: 0x%x/0x%x/0x%x\n", p->CPU.Vendor, p->CPU.Family, p->CPU.ExtFamily);
+		DBG("CPU: Model/ExtModel/Stepping: 0x%x/0x%x/0x%x\n", p->CPU.Model, p->CPU.ExtModel, p->CPU.Stepping);
+		DBG("CPU: Multipliers x10:         max=%d, min=%d\n", p->CPU.MaxRatio, p->CPU.MinRatio);
+	if(turbo)
+	{
+		DBG("Turbo Ratio:                  %d/%d/%d/%d\n", p->CPU.Tone, p->CPU.Ttwo, p->CPU.Tthr, p->CPU.Tfor);
+		p->CPU.Turbo = true;
+	}
+		DBG("CPU: MaxDiv/CurrDiv:          0x%x/0x%x\n", p->CPU.MaxDiv, p->CPU.CurrDiv);
+		DBG("CPU: TSCFreq:                 %dMHz\n", p->CPU.TSCFrequency / 1000000);
+		DBG("CPU: CPUFreq:                 %dMHz\n", p->CPU.CPUFrequency / 1000000);
+		DBG("CPU: FSBFreq:                 %dMHz\n", p->CPU.FSBFrequency / 1000000);
+	if(did)
+	{
+		p->CPU.SLFM = did;
+		DBG("CPU: SLFM:                    %d\n", p->CPU.SLFM);
+	}
+		if(platformCPUFeature(CPU_FEATURE_EST))
+		DBG("CPU: Enhanced SpeedStep:      %d\n", p->CPU.EST);
+		DBG("CPU: NoCores/NoThreads:       %d/%d\n", p->CPU.NoCores, p->CPU.NoThreads);
+		DBG("CPU: Features:                0x%08x\n", p->CPU.Features);
 }

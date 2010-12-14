@@ -58,6 +58,8 @@
 #include "ramdisk.h"
 #include "gui.h"
 #include "platform.h"
+#include "edid.h"
+#include "autoresolution.h"
 
 long gBootMode; /* defaults to 0 == kBootModeNormal */
 bool gOverrideKernel;
@@ -78,6 +80,7 @@ BVRef   bvr;
 BVRef   menuBVR;
 BVRef   bvChain;
 bool    useGUI;
+bool	autoResolution;
 
 //static void selectBiosDevice(void);
 static unsigned long Adler32(unsigned char *buffer, long length);
@@ -178,7 +181,7 @@ static int ExecKernel(void *binary)
 
     bool dummyVal;
 	if (getBoolForKey(kWaitForKeypressKey, &dummyVal, &bootInfo->bootConfig) && dummyVal) {
-		printf("Press any key to continue...");
+		printf("Press any key to continue...\n");
 		getc();
 	}
 
@@ -264,9 +267,6 @@ void common_boot(int biosdev)
     printf("after video_mode\n");
 #endif
 
-    // Scan and record the system's hardware information.
-    scan_platform();
-
     // First get info for boot volume.
     scanBootVolumes(gBIOSDev, 0);
     bvChain = getBVChainForBIOSDev(gBIOSDev);
@@ -274,6 +274,9 @@ void common_boot(int biosdev)
     
     // Load boot.plist config file
     status = loadSystemConfig(&bootInfo->bootConfig);
+
+    // Scan and record the system's hardware information.
+    scan_platform();
 
     if (getBoolForKey(kQuietBootKey, &quiet, &bootInfo->bootConfig) && quiet) {
         gBootMode |= kBootModeQuiet;
@@ -324,14 +327,48 @@ void common_boot(int biosdev)
     getc();
 #endif
 
-	useGUI = true;
+	useGUI = TRUE;
 	// Override useGUI default
 	getBoolForKey(kGUIKey, &useGUI, &bootInfo->bootConfig);
-	if (useGUI && initGUI())
+ 	
+ 	// Before initGui, patch the video bios with the correct resolution
+ 	
+ 	UInt32 params[4];
+ 	params[3] = 0;
+ 	
+	
+ 	gAutoResolution = TRUE;
+ 	// Override AutoResolution default
+ 	getBoolForKey(kAutoResolutionKey, &gAutoResolution, &bootInfo->bootConfig);
+ 	
+	//Open the VBios and store VBios or Tables
+	map = openVbios(CT_UNKWN);
+	
+ 	if (gAutoResolution == TRUE)
 	{
-		// initGUI() returned with an error, disabling GUI.
-		useGUI = false;
+		//Get Resolution from Graphics Mode key or EDID
+		int count = getNumberArrayFromProperty(kGraphicsModeKey, params, 4);
+		if (count < 3)
+			getResolution(params);
+		else
+		{
+			if ( params[2] == 256 ) params[2] = 8;
+			if ( params[2] == 555 ) params[2] = 16;
+			if ( params[2] == 888 ) params[2] = 32;
+		}
+
+#ifdef AUTORES_DEBUG
+		printf("Resolution: %dx%d\n",params[0], params[1]);
+#endif
+ 		//perfom the actual VBIOS patching
+		if (params[0] != 0 && params[1] != 0)
+			patchVbios(map, params[0], params[1], params[2], 0, 0);
 	}
+		
+     if (useGUI) {
+         /* XXX AsereBLN handle error */
+ 	initGUI();
+    }
 
     setBootGlobals(bvChain);
 
@@ -358,7 +395,7 @@ void common_boot(int biosdev)
         status = getBootOptions(firstRun);
         firstRun = false;
         if (status == -1) continue;
-		 
+		
         status = processBootOptions();
         // Status==1 means to chainboot
         if ( status ==  1 ) break;
@@ -394,6 +431,52 @@ void common_boot(int biosdev)
 			updateVRAM();
 		}
 		
+		/*
+		 * AutoResolution - Reapply the patch or cancel if Graphics Mode was incorrect
+		 *                  or EDID Info was insane
+		 */	
+	     getBoolForKey(kAutoResolutionKey, &gAutoResolution, &bootInfo->bootConfig);
+		
+		//Restore the vbios for Cancelation
+		if ((gAutoResolution == FALSE) && map)
+		{
+			restoreVbios(map);
+			closeVbios(map);	
+		}
+		
+		if ((gAutoResolution == TRUE) && map)
+		{
+			// If mode has been switched during boot menu
+			// use the new resolution
+			if (map->hasSwitched == true)
+			{
+				params[0] = map->currentX;
+				params[1] = map->currentY;
+				params[2] = 32;
+			}
+			else
+			{
+				//or get resolution from Graphics Mode or EDID
+				int count = getNumberArrayFromProperty(kGraphicsModeKey, params, 4);
+				if (count < 3)
+					getResolution(params);
+				else
+				{
+					if ( params[2] == 256 ) params[2] = 8;
+					if ( params[2] == 555 ) params[2] = 16;
+					if ( params[2] == 888 ) params[2] = 32;
+				}
+			}
+			
+			//Resolution has changed, reapply the patch
+			if ((params[0] != 0) && (params[1] != 0) && (params[0] != map->currentX) && (params[1] != map->currentY))
+			{
+				patchVbios(map, params[0], params[1], params[2], 0, 0);
+			}
+			
+			closeVbios(map);
+		}
+		
 		// Find out which version mac os we're booting.
 		getOSVersion(gMacOSVersion);
 
@@ -407,7 +490,13 @@ void common_boot(int biosdev)
 				archCpuType = CPU_TYPE_I386;
 			}
 		}
-
+		if (getValueForKey(k32BitModeFlag, &val, &len, &bootInfo->bootConfig)) {
+			archCpuType = CPU_TYPE_I386;
+		}
+		if (getValueForKey(k64BitModeFlag, &val, &len, &bootInfo->bootConfig)) {
+			archCpuType = CPU_TYPE_X86_64;
+		}
+		
 		if (!getBoolForKey (kWake, &tryresume, &bootInfo->bootConfig)) {
 			tryresume = true;
 			tryresumedefault = true;
@@ -528,12 +617,12 @@ void common_boot(int biosdev)
                 ret = GetFileInfo(NULL, bootFileSpec, &flags, &time); 
                 if (ret == -1)
                 {
-                  // Not found any alternate locations, using the original kernel image path.
+                  // No alternate location found. Using the original kernel image path instead.
                   strcpy(bootFileSpec, bootFile);
                 }
               }
             }
-            			
+            
             verbose("Loading kernel %s\n", bootFileSpec);
             ret = LoadThinFatFile(bootFileSpec, &binary);
             if (ret <= 0 && archCpuType == CPU_TYPE_X86_64)

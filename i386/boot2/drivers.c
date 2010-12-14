@@ -183,8 +183,12 @@ long LoadDrivers( char * dirSpec )
     else if ( gBootFileType == kBlockDeviceType )
     {
         // First try to load Extra extensions from the ramdisk if isn't aliased as bt(0,0).
-        if (gRAMDiskVolume && !gRAMDiskBTAliased)
+
+        // First try a specfic OS version folder ie 10.5
+        sprintf(dirSpecExtra, "rd(0,0)/Extra/%s/", &gMacOSVersion);
+        if (FileLoadDrivers(dirSpecExtra, 0) != 0)
         {
+          // Next we'll try the base
           strcpy(dirSpecExtra, "rd(0,0)/Extra/");
           FileLoadDrivers(dirSpecExtra, 0);
         }
@@ -226,7 +230,7 @@ long LoadDrivers( char * dirSpec )
 
         if (gMKextName[0] != '\0')
         {
-            verbose("LoadDrivers: Loading from [%s]\n", gMKextName);
+            verbose("LoadDrivers: %s\n", gMKextName);
             if ( LoadDriverMKext(gMKextName) != 0 )
             {
                 error("Could not load %s\n", gMKextName);
@@ -272,7 +276,7 @@ FileLoadMKext( const char * dirSpec, const char * extDirSpec )
           (((gBootMode & kBootModeSafe) == 0) && (time == (time2 + 1))))
       {
           sprintf(gDriverSpec, "%sExtensions.mkext", altDirSpec);
-          verbose("LoadDrivers: Loading from [%s]\n", gDriverSpec);
+          verbose("LoadDrivers: %s\n", gDriverSpec);
           if (LoadDriverMKext(gDriverSpec) == 0) return 0;
       }
   }

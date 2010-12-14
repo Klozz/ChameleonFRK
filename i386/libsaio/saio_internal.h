@@ -166,6 +166,9 @@ extern int    loadOverrideConfig(config_file_t *configBuff);
 extern char * newString(const char *oldString);
 extern char * getNextArg(char ** ptr, char * val);
 extern int	  ParseXMLFile( char * buffer, TagPtr * dict );
+//valv: experimenting with float
+extern double  getFloatForKey(const char * key, config_file_t *config);
+extern int   getIntForFloat(const char *key, char *val, config_file_t *configBuff);
 
 /* sys.c */
 extern BVRef getBootVolumeRef( const char * path, const char ** outPath );

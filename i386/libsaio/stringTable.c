@@ -396,9 +396,55 @@ bool getIntForKey( const char *key, int *value, config_file_t *config )
     return false;
 }
 
+
+// valv: experimenting with float
+double getFloatForKey(const char * key,  config_file_t *config)
+{
+  static const char* value =0;
+  char *val;
+  int size;
+  if (!(getValueForKey(key, &value, &size, config)) || (size == 0)) value = 0;
+  val = (char *)malloc(size + 1);
+  strlcpy(val, value, size + 1);
+  char **end = 0;
+  double result = strtod(val, end);
+  return result;
+}
+
 /*
- *
- */
+int getIntForFloat( const char *key, char *value, config_file_t *config )
+{
+    int size, sum, i;
+    bool isfloat = false;
+    sum = 0;
+    const char *val;
+
+    if (getValueForKey(key, &val, &size, config))
+	{
+		if ( size )
+		{
+
+			for(i = 0; i < size; i++)
+			{
+				if (val[i] == '.')
+				{
+					isfloat = true;
+					i++;
+				}
+
+				if (isdigit(val[i]) != 0)
+					sum = (sum * 10) + val[i];
+			}
+
+			if (!isfloat)
+				sum = (sum * 10);
+
+			return sum;
+		}
+	}
+    return 0;
+}
+*/
 
 bool getDimensionForKey( const char *key, unsigned int *value, config_file_t *config, unsigned int dimension_max, unsigned int object_size )
 {
@@ -607,8 +653,8 @@ int loadConfigFile (const char *configFile, config_file_t *config)
 int loadSystemConfig(config_file_t *config)
 {
 	char *dirspec[] = {
-		"/Extra/com.apple.Boot.plist",
 		"bt(0,0)/Extra/com.apple.Boot.plist",
+		"/Extra/com.apple.Boot.plist",
 		"/Library/Preferences/SystemConfiguration/com.apple.Boot.plist",
 		"/com.apple.boot.P/Library/Preferences/SystemConfiguration/com.apple.Boot.plist",
 		"/com.apple.boot.R/Library/Preferences/SystemConfiguration/com.apple.Boot.plist",

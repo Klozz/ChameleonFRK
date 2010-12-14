@@ -9,5 +9,7 @@
 #define MAX_CONFIGURATION_TABLE_ENTRIES 10
 
 extern void setupFakeEfi(void);
- 
+extern char MacModel[8];
+extern unsigned int ModelRev;
+
 #endif /* !__LIBSAIO_FAKE_EFI_H */

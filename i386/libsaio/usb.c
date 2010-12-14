@@ -38,7 +38,6 @@ int uhci_reset (pci_dt_t *pci_dev);
 // Add usb device to the list
 void notify_usb_dev(pci_dt_t *pci_dev)
 {
-	
 	struct pciList* current = usbList;
 	if(!usbList)
 	{
@@ -76,7 +75,7 @@ int usb_loop()
 	{
 		getBoolForKey(kEHCIacquire, &fix_ehci, &bootInfo->bootConfig);
 		getBoolForKey(kUHCIreset, &fix_uhci, &bootInfo->bootConfig);
-		getBoolForKey(kLegacyOff, &fix_legacy, &bootInfo->bootConfig);
+		getBoolForKey(kUSBLegacyOff, &fix_legacy, &bootInfo->bootConfig);
 	}
 	
 	struct pciList* current = usbList;

@@ -97,6 +97,7 @@ extern char * strncpy(char * s1, const char * s2, size_t n);
 extern char * strlcpy(char * s1, const char * s2, size_t n);
 extern char * strstr(const char *in, const char *str);
 extern int    atoi(const char * str);
+extern double atof(char * str); // valv: float
 extern int    ptol(const char * str);
 extern int    strlen(const char * str);
 extern char * strcat(char * s1, const char * s2);
@@ -111,6 +112,11 @@ extern char * strchr(const char *str, int c);
 extern char * strbreak(const char *str, char **next, long *len);
 
 extern uint8_t checksum8( void * start, unsigned int length );
+
+/*
+ * strtod.c
+ */
+extern double strtod(char *nptr, char **endptr);
 
 /*
  * error.c

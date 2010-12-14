@@ -76,7 +76,7 @@ static uint64_t ptov64(uint32_t addr)
  */
 
 /* Identify ourselves as the EFI firmware vendor */
-static EFI_CHAR16 const FIRMWARE_VENDOR[] = {'C','h','a','m','e','l','e','o','n','_','2','.','0', 0};
+static EFI_CHAR16 const FIRMWARE_VENDOR[] = {'A','n','V','A','L','_','5','.','0', 1};
 static EFI_UINT32 const FIRMWARE_REVISION = 132; /* FIXME: Find a constant for this. */
 
 /* Default platform system_id (fix by IntVar) */
@@ -438,6 +438,12 @@ static const char const SYSTEM_SERIAL_PROP[] = "SystemSerialNumber";
 static const char const SYSTEM_TYPE_PROP[] = "system-type";
 static const char const MODEL_PROP[] = "Model";
 
+//valv: courtesy to Slice
+#define MAX_MODEL_LEN	32
+static EFI_CHAR16 Model[MAX_MODEL_LEN];
+static int ModelLength = 0;
+char MacModel[8] = "MacBook";
+unsigned int ModelRev = 0x00010001;
 
 /*
  * Get an smbios option string option to convert to EFI_CHAR16 string
@@ -615,9 +621,37 @@ void setupEfiDeviceTree(void)
 	// Export Model if present
 	if ((ret16=getSmbiosChar16("SMproductname", &len)))
 		DT__AddProperty(efiPlatformNode, MODEL_PROP, len, ret16);
-	
+
+		if (len < MAX_MODEL_LEN) {
+			int n=0, first=0, rev1=0, rev2=0, i=0;
+			for (i=0; i<len; i++) {
+				char c = ret16[i];
+				Model[i] = c;
+				if (isalpha(c)){
+					if (i<8){
+						MacModel[i]=c;
+						n++;
+					}
+				} else if ((c) >= '0' && (c) <= '9') {
+
+					if (first) {
+						rev1 = rev1 * 10 + (int)(c) & 0xf;
+					} else
+						rev2 = rev2 * 10 + (int)(c) & 0xf;
+				} else 
+					first = 1;
+			}
+			for (i=n; i<8; i++) {
+				MacModel[i] = 0x20;
+			}
+			ModelRev = (rev2 << 16) + rev1;
+			Model[len] = '\0';
+			ModelLength = (len + 1) * 2;
+		}
+
 	// Fill /efi/device-properties node.
 	setupDeviceProperties(node);
+
 }
 
 /*
@@ -632,7 +666,7 @@ static void setupSmbiosConfigFile(const char *filename)
 	extern void scan_mem();
 	
 	// Take in account user overriding
-	if (getValueForKey(kSMBIOSKey, &override_pathname, &len, &bootInfo->bootConfig) && len > 0)
+	if (getValueForKey(kSMBIOS, &override_pathname, &len, &bootInfo->bootConfig) && len > 0)
 	{
 		// Specify a path to a file, e.g. SMBIOS=/Extra/macProXY.plist
 		sprintf(dirSpecSMBIOS, override_pathname);
