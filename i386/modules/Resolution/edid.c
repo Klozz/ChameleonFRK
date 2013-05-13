@@ -192,7 +192,7 @@ int fb_parse_edid(struct EDID *edid, edid_mode* var)  //(struct EDID *edid, UInt
 	int i;
 	unsigned char *block;
 	
-	if(!verifyEDID((unsigned char *)edid)) return 0;
+	if(!verifyEDID((unsigned char *)edid)) return 1;
 	
 	block = (unsigned char *)edid + DETAILED_TIMING_DESCRIPTIONS_START; //54
 	
@@ -205,7 +205,7 @@ int fb_parse_edid(struct EDID *edid, edid_mode* var)  //(struct EDID *edid, UInt
 			var->h_blanking = H_BLANKING;
 			var->v_blanking = V_BLANKING;
 			var->pixel_clock = PIXEL_CLOCK;
-			var->v_sync_offset = V_SYNC_OFFSET;
+			var->h_sync_width = H_SYNC_WIDTH;
 			var->v_sync_width = V_SYNC_WIDTH;
 			/*
 			var->xres = var->xres_virtual = H_ACTIVE;
@@ -258,7 +258,6 @@ void getResolution(UInt32* x, UInt32* y, UInt32* bp)
 		char* edidInfo = readEDID();
 		
 		if(!edidInfo) return;
-		
 		edid_mode mode;
 		// TODO: check *all* resolutions reported and either use the highest, or the native resolution (if there is a flag for that)
 		//xResolution =  edidInfo[56] | ((edidInfo[58] & 0xF0) << 4);  
@@ -327,15 +326,15 @@ char* readEDID()
 
 		status = getEDID(edidInfo, blocks_left);
 		
-		/*
+		
 		msglog("Buffer location: 0x%X status: %d\n", SEG(edidInfo) << 16 | OFF(edidInfo), status);
 		
 		int j, i;
 		for (j = 0; j < 8; j++) {
-			for(i = 0; i < 16; i++) msglog(" 0x%02X", edidInfo[((i+1) * (j + 1)) - 1]);
+			for(i = 0; i < 16; i++) msglog("0x%02X ", edidInfo[((i+1) * (j + 1)) - 1]);
 			msglog("\n");
 		}
-		*/
+		
 		
 		
 		if(status == 0)
@@ -360,7 +359,7 @@ char* readEDID()
 					)
 				{
 					msglog("Last reported %d\n", last_reported);
-					msglog("EDID blocks left is wrong.\n"
+					msglog( "EDID blocks left is wrong.\n"
 						   "Your EDID is probably invalid.\n");
 					return 0;
 				}

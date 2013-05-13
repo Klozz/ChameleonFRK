@@ -30,7 +30,6 @@
 #include "term.h"
 #include "embedded.h"
 #include "pci.h"
-#include "modules.h"
 
 bool showBootBanner = true; //Azi:showinfo
 static bool shouldboot = false;
@@ -189,15 +188,13 @@ static void clearBootArgs(void)
 	if (bootArgs->Video.v_display != VGA_TEXT_MODE) {
 		clearGraphicBootPrompt();
 	}
-
-	execute_hook("ClearArgs", NULL, NULL, NULL, NULL);
 }
 
-void addBootArg(const char * argStr)
+static void addBootArg(const char * argStr)
 {
 	if ( (gBootArgsPtr + strlen(argStr) + 1) < gBootArgsEnd)
 	{
-		if(gBootArgsPtr != gBootArgs) *gBootArgsPtr++ = ' ';
+		*gBootArgsPtr++ = ' ';
 		strcat(gBootArgs, argStr);
 		gBootArgsPtr += strlen(argStr);
 	}
@@ -265,14 +262,14 @@ static void updateBootArgs( int key )
                 {
                     updateGraphicBootPrompt();
                 }
-            }
+            }            
 			break;
 
         default:
             if ( key >= ' ' && gBootArgsPtr < gBootArgsEnd)
             {
                 *gBootArgsPtr++ = key;
-
+                
                 if( bootArgs->Video.v_display != VGA_TEXT_MODE ) updateGraphicBootPrompt();
                 else if ( key >= ' ' && key < 0x7f) putchar(key);
 			}
@@ -859,7 +856,7 @@ int getBootOptions(bool firstRun)
 		}
 
 		// Associate a menu item for each BVRef.
-		for (bvr=bvChain, i=gDeviceCount-1, selectIndex=-1; bvr; bvr=bvr->next) {
+		for (bvr=bvChain, i=gDeviceCount-1, selectIndex=0; bvr; bvr=bvr->next) {
 			if (bvr->visible) {
 				getBootVolumeDescription(bvr, menuItems[i].name, sizeof(menuItems[i].name) - 1, true);
 				menuItems[i].param = (void *) bvr;
@@ -867,16 +864,6 @@ int getBootOptions(bool firstRun)
 					selectIndex = i;
 				}
 				i--;
-			}
-		}
-		// Jief : In case the default partition (returned by selectBootVolume) is not in the menu
-		if ( selectIndex == -1 )
-		{
-			selectIndex = 0;
-			if ( gDeviceCount > 0 )
-			{
-				menuBVR = (BVRef)(menuItems[selectIndex].param);
-				// what happen is bvChain is empty ?
 			}
 		}
 	}
@@ -1048,7 +1035,7 @@ int getBootOptions(bool firstRun)
 					gui.redraw = true;
 					setVideoMode(GRAPHICS_MODE, 0);
 					updateVRAM();
-					updateGraphicBootPrompt();
+                    updateGraphicBootPrompt();
 				}
 			}
 			key = 0;
@@ -1071,7 +1058,6 @@ done:
 		free(menuItems);
 		menuItems = NULL;
 	}
-	execute_hook("BootOptions", gBootArgs, gBootArgsPtr, NULL, NULL);
 	return 0;
 }
 

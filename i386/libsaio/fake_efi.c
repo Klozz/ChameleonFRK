@@ -2,7 +2,7 @@
 /*
  * Copyright 2007 David F. Elliott.	 All rights reserved.
  */
-#include "saio_types.h"
+
 #include "libsaio.h"
 #include "boot.h"
 #include "bootstruct.h"
@@ -17,8 +17,6 @@
 #include "convert.h"
 #include "pci.h"
 #include "sl.h"
-
-
 
 extern void setup_pci_devs(pci_dt_t *pci_dt);
 
@@ -75,7 +73,7 @@ static uint64_t ptov64(uint32_t addr)
  */
 
 /* Identify ourselves as the EFI firmware vendor */
-static EFI_CHAR16 const FIRMWARE_VENDOR[] = {'C','h','a','m','e','l','e','o','n','_','2','.','2', 0};
+static EFI_CHAR16 const FIRMWARE_VENDOR[] = {'C','h','a','m','e','l','e','o','n','_','2','.','1', 0};
 static EFI_UINT32 const FIRMWARE_REVISION = 132; /* FIXME: Find a constant for this. */
 
 /* Default platform system_id (fix by IntVar) */
@@ -85,7 +83,7 @@ static EFI_CHAR8 const SYSTEM_ID[] = "0123456789ABCDEF"; //random value gen by u
 static uint8_t const VOIDRET_INSTRUCTIONS[] = {0xc3};
 
 /* movl $0x80000003,%eax; ret */
-static uint8_t const UNSUPPORTEDRET_INSTRUCTIONS[] = {0x48, 0xb8, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0xc3};
+static uint8_t const UNSUPPORTEDRET_INSTRUCTIONS[] = {0xb8, 0x03, 0x00, 0x00, 0x80, 0xc3};
 
 EFI_SYSTEM_TABLE_32 *gST32 = NULL;
 EFI_SYSTEM_TABLE_64 *gST64 = NULL;
@@ -174,7 +172,7 @@ void setupEfiTables32(void)
 	struct fake_efi_pages *fakeEfiPages = (struct fake_efi_pages*)AllocateKernelMemory(sizeof(struct fake_efi_pages));
 	
 	// Zero out all the tables in case fields are added later
-	//bzero(fakeEfiPages, sizeof(struct fake_efi_pages));
+	bzero(fakeEfiPages, sizeof(struct fake_efi_pages));
 	
 	// --------------------------------------------------------------------
 	// Initialize some machine code that will return EFI_UNSUPPORTED for
@@ -284,7 +282,7 @@ void setupEfiTables64(void)
 	struct fake_efi_pages *fakeEfiPages = (struct fake_efi_pages*)AllocateKernelMemory(sizeof(struct fake_efi_pages));
 	
 	// Zero out all the tables in case fields are added later
-	//bzero(fakeEfiPages, sizeof(struct fake_efi_pages));
+	bzero(fakeEfiPages, sizeof(struct fake_efi_pages));
 	
 	// --------------------------------------------------------------------
 	// Initialize some machine code that will return EFI_UNSUPPORTED for
@@ -390,9 +388,9 @@ void setupEfiTables64(void)
  */
 
 /* These should be const but DT__AddProperty takes char* */
-static const char TSC_Frequency_prop[] = "TSCFrequency";
-static const char FSB_Frequency_prop[] = "FSBFrequency";
-static const char CPU_Frequency_prop[] = "CPUFrequency";
+static const char const TSC_Frequency_prop[] = "TSCFrequency";
+static const char const FSB_Frequency_prop[] = "FSBFrequency";
+static const char const CPU_Frequency_prop[] = "CPUFrequency";
 
 /*==========================================================================
  * SMBIOS
@@ -426,16 +424,16 @@ EFI_GUID gEfiAcpi20TableGuid = EFI_ACPI_20_TABLE_GUID;
  */
 
 /* These should be const but DT__AddProperty takes char* */
-static const char FIRMWARE_REVISION_PROP[] = "firmware-revision";
-static const char FIRMWARE_ABI_PROP[] = "firmware-abi";
-static const char FIRMWARE_VENDOR_PROP[] = "firmware-vendor";
-static const char FIRMWARE_ABI_32_PROP_VALUE[] = "EFI32";
-static const char FIRMWARE_ABI_64_PROP_VALUE[] = "EFI64";
-static const char SYSTEM_ID_PROP[] = "system-id";
-static const char SYSTEM_SERIAL_PROP[] = "SystemSerialNumber";
-static const char SYSTEM_TYPE_PROP[] = "system-type";
-static const char MODEL_PROP[] = "Model";
-static const char BOARDID_PROP[] = "board-id";
+static const char const FIRMWARE_REVISION_PROP[] = "firmware-revision";
+static const char const FIRMWARE_ABI_PROP[] = "firmware-abi";
+static const char const FIRMWARE_VENDOR_PROP[] = "firmware-vendor";
+static const char const FIRMWARE_ABI_32_PROP_VALUE[] = "EFI32";
+static const char const FIRMWARE_ABI_64_PROP_VALUE[] = "EFI64";
+static const char const SYSTEM_ID_PROP[] = "system-id";
+static const char const SYSTEM_SERIAL_PROP[] = "SystemSerialNumber";
+static const char const SYSTEM_TYPE_PROP[] = "system-type";
+static const char const MODEL_PROP[] = "Model";
+static const char const BOARDID_PROP[] = "board-id";
 
 /*
  * Get an smbios option string option to convert to EFI_CHAR16 string
